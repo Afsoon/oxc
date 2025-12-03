@@ -566,6 +566,7 @@ pub(crate) mod oxc {
     pub mod no_async_endpoint_handlers;
     pub mod no_barrel_file;
     pub mod no_const_enum;
+    pub mod no_eslint_disable_comments;
     pub mod no_map_spread;
     pub mod no_optional_chaining;
     pub mod no_rest_spread_properties;
@@ -998,6 +999,7 @@ oxc_macros::declare_all_lint_rules! {
     oxc::no_barrel_file,
     oxc::no_const_enum,
     oxc::no_map_spread,
+    oxc::no_eslint_disable_comments,
     oxc::no_optional_chaining,
     oxc::no_rest_spread_properties,
     oxc::number_arg_out_of_range,

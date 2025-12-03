@@ -1,0 +1,50 @@
+---
+source: crates/oxc_linter/src/tester.rs
+---
+  ⚠ oxc(no-eslint-disable-comments): Detected eslint disable comment
+   ╭─[no_eslint_disable_comments.tsx:1:3]
+ 1 │ // eslint-disable
+   ·   ───────────────
+ 2 │             f();
+   ╰────
+  help: Prefer oxlint-disable instead of eslint-disable
+
+  ⚠ oxc(no-eslint-disable-comments): Detected eslint disable comment
+   ╭─[no_eslint_disable_comments.tsx:1:3]
+ 1 │ /* eslint-disable */
+   ·   ────────────────
+ 2 │             f();
+   ╰────
+  help: Prefer oxlint-disable instead of eslint-disable
+
+  ⚠ oxc(no-eslint-disable-comments): Detected eslint disable comment
+   ╭─[no_eslint_disable_comments.tsx:1:3]
+ 1 │ // eslint-disable no-use-before-define
+   ·   ────────────────────────────────────
+ 2 │             f();
+   ╰────
+  help: Prefer oxlint-disable instead of eslint-disable
+
+  ⚠ oxc(no-eslint-disable-comments): Detected eslint disable comment
+   ╭─[no_eslint_disable_comments.tsx:1:3]
+ 1 │ /* eslint-disable no-use-before-define */
+   ·   ─────────────────────────────────────
+ 2 │             f();
+   ╰────
+  help: Prefer oxlint-disable instead of eslint-disable
+
+  ⚠ oxc(no-eslint-disable-comments): Detected eslint disable comment
+   ╭─[no_eslint_disable_comments.tsx:1:3]
+ 1 │ /* eslint-disable-next-line */
+   ·   ──────────────────────────
+ 2 │             f();
+   ╰────
+  help: Prefer oxlint-disable instead of eslint-disable
+
+  ⚠ oxc(no-eslint-disable-comments): Detected eslint disable comment
+   ╭─[no_eslint_disable_comments.tsx:1:3]
+ 1 │ // eslint-disable-next-line
+   ·   ─────────────────────────
+ 2 │             f();
+   ╰────
+  help: Prefer oxlint-disable instead of eslint-disable
