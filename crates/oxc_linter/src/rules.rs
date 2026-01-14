@@ -339,6 +339,7 @@ pub(crate) mod jest {
     pub mod prefer_jest_mocked;
     pub mod prefer_lowercase_title;
     pub mod prefer_mock_promise_shorthand;
+    pub mod prefer_mock_return_shorthand;
     pub mod prefer_spy_on;
     pub mod prefer_strict_equal;
     pub mod prefer_to_be;
@@ -678,6 +679,7 @@ pub(crate) mod vitest {
     pub mod prefer_called_once;
     pub mod prefer_called_times;
     pub mod prefer_describe_function_title;
+    pub mod prefer_mock_return_shorthand;
     pub mod prefer_to_be_falsy;
     pub mod prefer_to_be_object;
     pub mod prefer_to_be_truthy;
@@ -947,6 +949,7 @@ oxc_macros::declare_all_lint_rules! {
     jest::prefer_jest_mocked,
     jest::prefer_lowercase_title,
     jest::prefer_mock_promise_shorthand,
+    jest::prefer_mock_return_shorthand,
     jest::prefer_spy_on,
     jest::prefer_strict_equal,
     jest::prefer_to_be,
@@ -1351,6 +1354,7 @@ oxc_macros::declare_all_lint_rules! {
     vitest::prefer_called_once,
     vitest::prefer_called_times,
     vitest::prefer_describe_function_title,
+    vitest::prefer_mock_return_shorthand,
     vitest::prefer_to_be_falsy,
     vitest::prefer_to_be_object,
     vitest::prefer_to_be_truthy,
