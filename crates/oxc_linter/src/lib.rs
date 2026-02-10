@@ -447,7 +447,7 @@ impl Linter {
                         return false;
                     };
 
-                    count_file.count != count_runtime.count
+                    count_file.count < count_runtime.count
                 })
                 .collect();
 
