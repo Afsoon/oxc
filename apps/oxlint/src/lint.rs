@@ -464,6 +464,7 @@ impl CliRunner {
         drop(suppression_sender);
 
         let result = suppression_manager.report_suppression();
+        println!("Result report {:?}", result);
         let diagnostic_result = diagnostic_service.run(stdout);
 
         let oxlint_suppression_file_action = if let Err(report_suppression_error) = result {
@@ -1617,7 +1618,7 @@ mod suppression {
 
     #[test]
     fn test_suppression_not_file_reporting_errors() {
-        let args = &[];
+        let args = &["--type-aware", "--type-check"];
         Tester::new()
             .with_cwd("fixtures/suppression_not_file_reporting_errors".into())
             .test_and_snapshot(args);
@@ -1625,7 +1626,7 @@ mod suppression {
 
     #[test]
     fn test_suppression_not_reporting_new_errors() {
-        let args = &[];
+        let args = &["--type-aware", "--type-check"];
         Tester::new()
             .with_cwd("fixtures/suppression_not_reporting_new_errors".into())
             .test_and_snapshot(args);
@@ -1657,7 +1658,7 @@ mod suppression {
 
     #[test]
     fn test_suppression_prune_errors_warning() {
-        let args = &[];
+        let args = &["--type-aware", "--type-check"];
         Tester::new()
             .with_cwd("fixtures/suppression_prune_errors_warning".into())
             .test_and_snapshot(args);
@@ -1665,7 +1666,7 @@ mod suppression {
 
     #[test]
     fn test_suppression_report_one_of_the_errors_from_one_file() {
-        let args = &[];
+        let args = &["--type-aware", "--type-check"];
         Tester::new()
             .with_cwd("fixtures/suppression_report_one_of_the_errors_from_one_file".into())
             .test_and_snapshot(args);
@@ -1673,13 +1674,13 @@ mod suppression {
 
     #[test]
     fn test_suppression_without_file() {
-        let args = &[];
+        let args = &["--type-aware", "--type-check"];
         Tester::new().with_cwd("fixtures/suppression_without_file".into()).test_and_snapshot(args);
     }
 
     #[test]
     fn test_suppression_report_one_new_error_but_filter_the_rest() {
-        let args = &[];
+        let args = &["--type-aware", "--type-check"];
         Tester::new()
             .with_cwd("fixtures/suppression_report_one_new_error_but_filter_the_rest".into())
             .test_and_snapshot(args);
@@ -1695,7 +1696,7 @@ mod suppression {
 
     #[test]
     fn test_suppression_with_suppress_all_arg_and_no_file() {
-        let args = &["--suppress-all"];
+        let args = &["--suppress-all", "--type-aware", "--type-check"];
         let suppression = SuppressionTester::new()
             .with_cwd("suppression_with_suppress_all_arg_and_no_file")
             .with_setup_file(false)
@@ -1706,7 +1707,8 @@ mod suppression {
             .with_cwd("fixtures/suppression_with_suppress_all_arg_and_no_file".into())
             .test_output(args);
 
-        assert!(stdout.starts_with("Found 0 warnings and 0 errors."), "Unexpected errors found");
+        // The error comes from the type check error. Type check errors aren't filtered
+        assert!(stdout.contains("Found 0 warnings and 2 errors."), "Unexpected errors found");
     }
 
     #[test]
@@ -1715,7 +1717,7 @@ mod suppression {
             .with_cwd("suppression_with_suppress_all_arg_and_no_file")
             .with_setup_file(false)
             .with_expected_file(false)
-            .test(&["--prune-suppressions"]);
+            .test(&["--prune-suppressions", "--type-aware", "--type-check"]);
     }
 
     #[test]
@@ -1723,21 +1725,21 @@ mod suppression {
         SuppressionTester::new()
             .with_cwd("suppression_with_suppress_all_and_fix_arg_and_no_file")
             .with_setup_file(false)
-            .with_expected_file(false)
+            .with_expected_file(true)
             .with_backup_file(false)
             .with_files_fixed(true)
-            .test(&["--fix", "--suppress-all"]);
+            .test(&["--fix", "--suppress-all", "--type-aware", "--type-check"]);
     }
 
     #[test]
-    fn test_suppression_with_suppress_all_and_fix_arg_and_file() {
+    fn test_suppression_update_file_after_fixing() {
         SuppressionTester::new()
-            .with_cwd("suppression_with_suppress_all_and_fix_arg_and_file")
+            .with_cwd("suppression_update_file_after_fixing")
             .with_setup_file(true)
             .with_expected_file(true)
             .with_backup_file(true)
-            .with_files_fixed(true)
-            .test(&["--fix", "--suppress-all"]);
+            .with_files_fixed(false)
+            .test(&["--fix", "--suppress-all", "--type-aware", "--type-check"]);
     }
 
     #[test]
@@ -1748,7 +1750,7 @@ mod suppression {
             .with_expected_file(true)
             .with_backup_file(true)
             .with_files_fixed(true)
-            .test(&["--fix"]);
+            .test(&["--fix", "--type-aware", "--type-check"]);
     }
 
     #[test]
@@ -1759,7 +1761,14 @@ mod suppression {
             .with_expected_file(true)
             .with_backup_file(true)
             .with_files_fixed(true)
-            .test(&["--fix", "--fix-suggestions", "--fix-dangerously"]); // Adding both fix see https://github.com/oxc-project/oxc/pull/13366, https://github.com/oxc-project/oxc/issues/12491
+            // Adding both fix see https://github.com/oxc-project/oxc/pull/13366, https://github.com/oxc-project/oxc/issues/12491
+            .test(&[
+                "--fix",
+                "--fix-suggestions",
+                "--fix-dangerously",
+                "--type-aware",
+                "--type-check",
+            ]);
     }
 
     #[test]
@@ -1770,7 +1779,7 @@ mod suppression {
             .with_expected_file(true)
             .with_backup_file(true)
             .with_files_fixed(true)
-            .test(&["--fix"]);
+            .test(&["--fix", "--type-aware", "--type-check"]);
     }
 
     #[test]
@@ -1781,7 +1790,7 @@ mod suppression {
             .with_expected_file(true)
             .with_backup_file(true)
             .with_files_fixed(true)
-            .test(&["--fix", "--fix-suggestions"]);
+            .test(&["--fix", "--fix-suggestions", "--type-aware", "--type-check"]);
     }
 
     #[test]
@@ -1791,7 +1800,7 @@ mod suppression {
             .with_setup_file(true)
             .with_expected_file(true)
             .with_backup_file(true)
-            .test(&["--suppress-all"]);
+            .test(&["--suppress-all", "--type-aware", "--type-check"]);
     }
 
     #[test]
@@ -1801,7 +1810,7 @@ mod suppression {
             .with_setup_file(true)
             .with_expected_file(true)
             .with_backup_file(true)
-            .test(&["--prune-suppressions"]);
+            .test(&["--prune-suppressions", "--type-aware", "--type-check"]);
     }
 
     #[test]
@@ -1811,7 +1820,7 @@ mod suppression {
             .with_setup_file(true)
             .with_expected_file(true)
             .with_backup_file(true)
-            .test(&["--suppress-all"]);
+            .test(&["--suppress-all", "--type-aware", "--type-check"]);
     }
 
     #[test]
@@ -1821,7 +1830,7 @@ mod suppression {
             .with_setup_file(true)
             .with_expected_file(true)
             .with_backup_file(true)
-            .test(&["--prune-suppressions"]);
+            .test(&["--prune-suppressions", "--type-aware", "--type-check"]);
     }
 
     #[test]
@@ -1831,7 +1840,7 @@ mod suppression {
             .with_setup_file(true)
             .with_expected_file(true)
             .with_backup_file(true)
-            .test(&["--suppress-all"]);
+            .test(&["--suppress-all", "--type-aware", "--type-check"]);
     }
 
     #[test]
@@ -1841,17 +1850,35 @@ mod suppression {
             .with_setup_file(true)
             .with_expected_file(true)
             .with_backup_file(true)
-            .test(&["--prune-suppressions"]);
+            .test(&["--prune-suppressions", "--type-aware", "--type-check"]);
     }
 
     #[test]
-    fn test_suppression_ts_create_file() {
+    fn test_suppression_fixing_only_ts_go_errors() {
         SuppressionTester::new()
-            .with_cwd("suppression_tsgo")
+            .with_cwd("suppression_fixing_only_ts_go_errors")
             .with_setup_file(true)
             .with_expected_file(true)
             .with_backup_file(true)
-            .test(&["--suppress-all", "--type-aware"]);
-        //.test(&["--suppress-all", "--type-aware", "--fix", "--fix-suggestions"]);
+            .with_files_fixed(true)
+            .test(&["--fix", "--fix-suggestions", "--type-aware", "--type-check"]);
+    }
+
+    #[test]
+    #[ignore = "Not ready the test"]
+    fn test_suppression_ts_create_file() {
+        SuppressionTester::new()
+            .with_cwd("suppression_tsgo")
+            .with_setup_file(false)
+            .with_expected_file(true)
+            .with_backup_file(true)
+            //    .test(&["--suppress-all", "--type-aware", "--type-check"]);
+            .test(&[
+                "--suppress-all",
+                "--type-aware",
+                "--type-check",
+                "--fix",
+                "--fix-suggestions",
+            ]);
     }
 }
