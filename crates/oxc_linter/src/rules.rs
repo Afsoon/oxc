@@ -365,6 +365,7 @@ pub(crate) mod jest {
     pub mod prefer_each;
     pub mod prefer_ending_with_an_expect;
     pub mod prefer_equality_matcher;
+    pub mod prefer_expect_assertions;
     pub mod prefer_expect_resolves;
     pub mod prefer_hooks_in_order;
     pub mod prefer_hooks_on_top;

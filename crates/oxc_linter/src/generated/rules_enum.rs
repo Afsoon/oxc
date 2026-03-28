@@ -250,6 +250,7 @@ pub use crate::rules::jest::prefer_comparison_matcher::PreferComparisonMatcher a
 pub use crate::rules::jest::prefer_each::PreferEach as JestPreferEach;
 pub use crate::rules::jest::prefer_ending_with_an_expect::PreferEndingWithAnExpect as JestPreferEndingWithAnExpect;
 pub use crate::rules::jest::prefer_equality_matcher::PreferEqualityMatcher as JestPreferEqualityMatcher;
+pub use crate::rules::jest::prefer_expect_assertions::PreferExpectAssertions as JestPreferExpectAssertions;
 pub use crate::rules::jest::prefer_expect_resolves::PreferExpectResolves as JestPreferExpectResolves;
 pub use crate::rules::jest::prefer_hooks_in_order::PreferHooksInOrder as JestPreferHooksInOrder;
 pub use crate::rules::jest::prefer_hooks_on_top::PreferHooksOnTop as JestPreferHooksOnTop;
@@ -1106,6 +1107,7 @@ pub enum RuleEnum {
     JestPreferEach(JestPreferEach),
     JestPreferEndingWithAnExpect(JestPreferEndingWithAnExpect),
     JestPreferEqualityMatcher(JestPreferEqualityMatcher),
+    JestPreferExpectAssertions(JestPreferExpectAssertions),
     JestPreferExpectResolves(JestPreferExpectResolves),
     JestPreferHooksInOrder(JestPreferHooksInOrder),
     JestPreferHooksOnTop(JestPreferHooksOnTop),
@@ -1891,7 +1893,8 @@ const JEST_PREFER_COMPARISON_MATCHER_ID: usize = JEST_PREFER_CALLED_WITH_ID + 1u
 const JEST_PREFER_EACH_ID: usize = JEST_PREFER_COMPARISON_MATCHER_ID + 1usize;
 const JEST_PREFER_ENDING_WITH_AN_EXPECT_ID: usize = JEST_PREFER_EACH_ID + 1usize;
 const JEST_PREFER_EQUALITY_MATCHER_ID: usize = JEST_PREFER_ENDING_WITH_AN_EXPECT_ID + 1usize;
-const JEST_PREFER_EXPECT_RESOLVES_ID: usize = JEST_PREFER_EQUALITY_MATCHER_ID + 1usize;
+const JEST_PREFER_EXPECT_ASSERTIONS_ID: usize = JEST_PREFER_EQUALITY_MATCHER_ID + 1usize;
+const JEST_PREFER_EXPECT_RESOLVES_ID: usize = JEST_PREFER_EXPECT_ASSERTIONS_ID + 1usize;
 const JEST_PREFER_HOOKS_IN_ORDER_ID: usize = JEST_PREFER_EXPECT_RESOLVES_ID + 1usize;
 const JEST_PREFER_HOOKS_ON_TOP_ID: usize = JEST_PREFER_HOOKS_IN_ORDER_ID + 1usize;
 const JEST_PREFER_IMPORTING_JEST_GLOBALS_ID: usize = JEST_PREFER_HOOKS_ON_TOP_ID + 1usize;
@@ -2747,6 +2750,7 @@ impl RuleEnum {
             Self::JestPreferEach(_) => JEST_PREFER_EACH_ID,
             Self::JestPreferEndingWithAnExpect(_) => JEST_PREFER_ENDING_WITH_AN_EXPECT_ID,
             Self::JestPreferEqualityMatcher(_) => JEST_PREFER_EQUALITY_MATCHER_ID,
+            Self::JestPreferExpectAssertions(_) => JEST_PREFER_EXPECT_ASSERTIONS_ID,
             Self::JestPreferExpectResolves(_) => JEST_PREFER_EXPECT_RESOLVES_ID,
             Self::JestPreferHooksInOrder(_) => JEST_PREFER_HOOKS_IN_ORDER_ID,
             Self::JestPreferHooksOnTop(_) => JEST_PREFER_HOOKS_ON_TOP_ID,
@@ -3599,6 +3603,7 @@ impl RuleEnum {
             Self::JestPreferEach(_) => JestPreferEach::NAME,
             Self::JestPreferEndingWithAnExpect(_) => JestPreferEndingWithAnExpect::NAME,
             Self::JestPreferEqualityMatcher(_) => JestPreferEqualityMatcher::NAME,
+            Self::JestPreferExpectAssertions(_) => JestPreferExpectAssertions::NAME,
             Self::JestPreferExpectResolves(_) => JestPreferExpectResolves::NAME,
             Self::JestPreferHooksInOrder(_) => JestPreferHooksInOrder::NAME,
             Self::JestPreferHooksOnTop(_) => JestPreferHooksOnTop::NAME,
@@ -4465,6 +4470,7 @@ impl RuleEnum {
             Self::JestPreferEach(_) => JestPreferEach::CATEGORY,
             Self::JestPreferEndingWithAnExpect(_) => JestPreferEndingWithAnExpect::CATEGORY,
             Self::JestPreferEqualityMatcher(_) => JestPreferEqualityMatcher::CATEGORY,
+            Self::JestPreferExpectAssertions(_) => JestPreferExpectAssertions::CATEGORY,
             Self::JestPreferExpectResolves(_) => JestPreferExpectResolves::CATEGORY,
             Self::JestPreferHooksInOrder(_) => JestPreferHooksInOrder::CATEGORY,
             Self::JestPreferHooksOnTop(_) => JestPreferHooksOnTop::CATEGORY,
@@ -5338,6 +5344,7 @@ impl RuleEnum {
             Self::JestPreferEach(_) => JestPreferEach::FIX,
             Self::JestPreferEndingWithAnExpect(_) => JestPreferEndingWithAnExpect::FIX,
             Self::JestPreferEqualityMatcher(_) => JestPreferEqualityMatcher::FIX,
+            Self::JestPreferExpectAssertions(_) => JestPreferExpectAssertions::FIX,
             Self::JestPreferExpectResolves(_) => JestPreferExpectResolves::FIX,
             Self::JestPreferHooksInOrder(_) => JestPreferHooksInOrder::FIX,
             Self::JestPreferHooksOnTop(_) => JestPreferHooksOnTop::FIX,
@@ -6273,6 +6280,7 @@ impl RuleEnum {
             Self::JestPreferEach(_) => JestPreferEach::documentation(),
             Self::JestPreferEndingWithAnExpect(_) => JestPreferEndingWithAnExpect::documentation(),
             Self::JestPreferEqualityMatcher(_) => JestPreferEqualityMatcher::documentation(),
+            Self::JestPreferExpectAssertions(_) => JestPreferExpectAssertions::documentation(),
             Self::JestPreferExpectResolves(_) => JestPreferExpectResolves::documentation(),
             Self::JestPreferHooksInOrder(_) => JestPreferHooksInOrder::documentation(),
             Self::JestPreferHooksOnTop(_) => JestPreferHooksOnTop::documentation(),
@@ -7828,6 +7836,10 @@ impl RuleEnum {
                 JestPreferEqualityMatcher::config_schema(generator)
                     .or_else(|| JestPreferEqualityMatcher::schema(generator))
             }
+            Self::JestPreferExpectAssertions(_) => {
+                JestPreferExpectAssertions::config_schema(generator)
+                    .or_else(|| JestPreferExpectAssertions::schema(generator))
+            }
             Self::JestPreferExpectResolves(_) => JestPreferExpectResolves::config_schema(generator)
                 .or_else(|| JestPreferExpectResolves::schema(generator)),
             Self::JestPreferHooksInOrder(_) => JestPreferHooksInOrder::config_schema(generator)
@@ -9284,6 +9296,7 @@ impl RuleEnum {
             Self::JestPreferEach(_) => "jest",
             Self::JestPreferEndingWithAnExpect(_) => "jest",
             Self::JestPreferEqualityMatcher(_) => "jest",
+            Self::JestPreferExpectAssertions(_) => "jest",
             Self::JestPreferExpectResolves(_) => "jest",
             Self::JestPreferHooksInOrder(_) => "jest",
             Self::JestPreferHooksOnTop(_) => "jest",
@@ -10814,6 +10827,9 @@ impl RuleEnum {
             )),
             Self::JestPreferEqualityMatcher(_) => Ok(Self::JestPreferEqualityMatcher(
                 JestPreferEqualityMatcher::from_configuration(value)?,
+            )),
+            Self::JestPreferExpectAssertions(_) => Ok(Self::JestPreferExpectAssertions(
+                JestPreferExpectAssertions::from_configuration(value)?,
             )),
             Self::JestPreferExpectResolves(_) => Ok(Self::JestPreferExpectResolves(
                 JestPreferExpectResolves::from_configuration(value)?,
@@ -12401,6 +12417,7 @@ impl RuleEnum {
             Self::JestPreferEach(rule) => rule.to_configuration(),
             Self::JestPreferEndingWithAnExpect(rule) => rule.to_configuration(),
             Self::JestPreferEqualityMatcher(rule) => rule.to_configuration(),
+            Self::JestPreferExpectAssertions(rule) => rule.to_configuration(),
             Self::JestPreferExpectResolves(rule) => rule.to_configuration(),
             Self::JestPreferHooksInOrder(rule) => rule.to_configuration(),
             Self::JestPreferHooksOnTop(rule) => rule.to_configuration(),
@@ -13143,6 +13160,7 @@ impl RuleEnum {
             Self::JestPreferEach(rule) => rule.run(node, ctx),
             Self::JestPreferEndingWithAnExpect(rule) => rule.run(node, ctx),
             Self::JestPreferEqualityMatcher(rule) => rule.run(node, ctx),
+            Self::JestPreferExpectAssertions(rule) => rule.run(node, ctx),
             Self::JestPreferExpectResolves(rule) => rule.run(node, ctx),
             Self::JestPreferHooksInOrder(rule) => rule.run(node, ctx),
             Self::JestPreferHooksOnTop(rule) => rule.run(node, ctx),
@@ -13883,6 +13901,7 @@ impl RuleEnum {
             Self::JestPreferEach(rule) => rule.run_once(ctx),
             Self::JestPreferEndingWithAnExpect(rule) => rule.run_once(ctx),
             Self::JestPreferEqualityMatcher(rule) => rule.run_once(ctx),
+            Self::JestPreferExpectAssertions(rule) => rule.run_once(ctx),
             Self::JestPreferExpectResolves(rule) => rule.run_once(ctx),
             Self::JestPreferHooksInOrder(rule) => rule.run_once(ctx),
             Self::JestPreferHooksOnTop(rule) => rule.run_once(ctx),
@@ -14693,6 +14712,7 @@ impl RuleEnum {
             Self::JestPreferEach(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::JestPreferEndingWithAnExpect(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::JestPreferEqualityMatcher(rule) => rule.run_on_jest_node(jest_node, ctx),
+            Self::JestPreferExpectAssertions(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::JestPreferExpectResolves(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::JestPreferHooksInOrder(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::JestPreferHooksOnTop(rule) => rule.run_on_jest_node(jest_node, ctx),
@@ -15469,6 +15489,7 @@ impl RuleEnum {
             Self::JestPreferEach(rule) => rule.should_run(ctx),
             Self::JestPreferEndingWithAnExpect(rule) => rule.should_run(ctx),
             Self::JestPreferEqualityMatcher(rule) => rule.should_run(ctx),
+            Self::JestPreferExpectAssertions(rule) => rule.should_run(ctx),
             Self::JestPreferExpectResolves(rule) => rule.should_run(ctx),
             Self::JestPreferHooksInOrder(rule) => rule.should_run(ctx),
             Self::JestPreferHooksOnTop(rule) => rule.should_run(ctx),
@@ -16367,6 +16388,7 @@ impl RuleEnum {
             Self::JestPreferEach(_) => JestPreferEach::IS_TSGOLINT_RULE,
             Self::JestPreferEndingWithAnExpect(_) => JestPreferEndingWithAnExpect::IS_TSGOLINT_RULE,
             Self::JestPreferEqualityMatcher(_) => JestPreferEqualityMatcher::IS_TSGOLINT_RULE,
+            Self::JestPreferExpectAssertions(_) => JestPreferExpectAssertions::IS_TSGOLINT_RULE,
             Self::JestPreferExpectResolves(_) => JestPreferExpectResolves::IS_TSGOLINT_RULE,
             Self::JestPreferHooksInOrder(_) => JestPreferHooksInOrder::IS_TSGOLINT_RULE,
             Self::JestPreferHooksOnTop(_) => JestPreferHooksOnTop::IS_TSGOLINT_RULE,
@@ -18274,6 +18296,7 @@ impl RuleEnum {
             Self::JestPreferEach(_) => JestPreferEach::HAS_CONFIG,
             Self::JestPreferEndingWithAnExpect(_) => JestPreferEndingWithAnExpect::HAS_CONFIG,
             Self::JestPreferEqualityMatcher(_) => JestPreferEqualityMatcher::HAS_CONFIG,
+            Self::JestPreferExpectAssertions(_) => JestPreferExpectAssertions::HAS_CONFIG,
             Self::JestPreferExpectResolves(_) => JestPreferExpectResolves::HAS_CONFIG,
             Self::JestPreferHooksInOrder(_) => JestPreferHooksInOrder::HAS_CONFIG,
             Self::JestPreferHooksOnTop(_) => JestPreferHooksOnTop::HAS_CONFIG,
@@ -19094,6 +19117,7 @@ impl RuleEnum {
             Self::JestPreferEach(rule) => rule.types_info(),
             Self::JestPreferEndingWithAnExpect(rule) => rule.types_info(),
             Self::JestPreferEqualityMatcher(rule) => rule.types_info(),
+            Self::JestPreferExpectAssertions(rule) => rule.types_info(),
             Self::JestPreferExpectResolves(rule) => rule.types_info(),
             Self::JestPreferHooksInOrder(rule) => rule.types_info(),
             Self::JestPreferHooksOnTop(rule) => rule.types_info(),
@@ -19834,6 +19858,7 @@ impl RuleEnum {
             Self::JestPreferEach(rule) => rule.run_info(),
             Self::JestPreferEndingWithAnExpect(rule) => rule.run_info(),
             Self::JestPreferEqualityMatcher(rule) => rule.run_info(),
+            Self::JestPreferExpectAssertions(rule) => rule.run_info(),
             Self::JestPreferExpectResolves(rule) => rule.run_info(),
             Self::JestPreferHooksInOrder(rule) => rule.run_info(),
             Self::JestPreferHooksOnTop(rule) => rule.run_info(),
@@ -20662,6 +20687,7 @@ pub static RULES: std::sync::LazyLock<Vec<RuleEnum>> = std::sync::LazyLock::new(
         RuleEnum::JestPreferEach(JestPreferEach::default()),
         RuleEnum::JestPreferEndingWithAnExpect(JestPreferEndingWithAnExpect::default()),
         RuleEnum::JestPreferEqualityMatcher(JestPreferEqualityMatcher::default()),
+        RuleEnum::JestPreferExpectAssertions(JestPreferExpectAssertions::default()),
         RuleEnum::JestPreferExpectResolves(JestPreferExpectResolves::default()),
         RuleEnum::JestPreferHooksInOrder(JestPreferHooksInOrder::default()),
         RuleEnum::JestPreferHooksOnTop(JestPreferHooksOnTop::default()),
