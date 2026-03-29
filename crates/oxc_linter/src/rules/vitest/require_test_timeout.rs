@@ -239,7 +239,7 @@ fn test() {
     use crate::tester::Tester;
 
     /*
-     * Commented test are invalid because Vitest doesn't allow that API for timeout https://vitest.dev/api/test.html#timeout
+     * Commented tests are invalid because Vitest doesn't allow that API for timeout https://vitest.dev/api/test.html#timeout
      */
     let pass = vec![
         r#"test.todo("a")"#,
