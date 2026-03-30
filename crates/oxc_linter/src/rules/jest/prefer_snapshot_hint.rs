@@ -1,6 +1,9 @@
 use std::ops::Deref;
 
-use oxc_ast::{AstKind, ast::CallExpression};
+use oxc_ast::{
+    AstKind,
+    ast::{CallExpression, Expression},
+};
 use oxc_diagnostics::OxcDiagnostic;
 use oxc_macros::declare_oxc_lint;
 use oxc_semantic::NodeId;
@@ -38,17 +41,12 @@ fn snapshot_hint_must_be_string_diagnostic(span: Span) -> OxcDiagnostic {
         .with_label(span)
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SnapshotHintMode {
     Always,
+    #[default]
     Multi,
-}
-
-impl Default for SnapshotHintMode {
-    fn default() -> Self {
-        Self::Multi
-    }
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -260,10 +258,10 @@ impl Rule for PreferSnapshotHint {
         possible_jest_nodes.sort_unstable_by_key(|n| n.node.id());
 
         for possible_jest_node in possible_jest_nodes {
-            self.check_node(&possible_jest_node, &mut scoped_expects, ctx);
+            Self::check_node(&possible_jest_node, &mut scoped_expects, ctx);
         }
 
-        for (_scope_id, call_expects) in scoped_expects.iter() {
+        for call_expects in scoped_expects.values() {
             self.check_expects(call_expects, ctx);
         }
     }
@@ -286,10 +284,10 @@ fn get_scope_owner(node_id: NodeId, ctx: &LintContext<'_>) -> NodeId {
                 last_function_id = Some(ancestor.id());
 
                 let parent = ctx.nodes().parent_node(ancestor.id());
-                if let AstKind::CallExpression(call) = parent.kind() {
-                    if is_test_node(call) {
-                        return ancestor.id();
-                    }
+                if let AstKind::CallExpression(call) = parent.kind()
+                    && is_test_node(call)
+                {
+                    return ancestor.id();
                 }
             }
             AstKind::Program(_) => {
@@ -304,7 +302,6 @@ fn get_scope_owner(node_id: NodeId, ctx: &LintContext<'_>) -> NodeId {
 
 impl PreferSnapshotHint {
     fn check_node<'a>(
-        &self,
         possible_jest_node: &PossibleJestNode<'a, '_>,
         scoped_expects: &mut FxHashMap<NodeId, Vec<&'a CallExpression<'a>>>,
         ctx: &LintContext<'a>,
@@ -369,7 +366,7 @@ impl PreferSnapshotHint {
                 continue;
             };
 
-            if !first_arg.as_expression().is_some_and(|expr| expr.is_string_literal()) {
+            if !first_arg.as_expression().is_some_and(Expression::is_string_literal) {
                 ctx.diagnostic(snapshot_hint_must_be_string_diagnostic(expect_call_expr.span));
             }
         }
