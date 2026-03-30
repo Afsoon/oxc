@@ -252,6 +252,7 @@ pub use crate::rules::jest::prefer_jest_mocked::PreferJestMocked as JestPreferJe
 pub use crate::rules::jest::prefer_lowercase_title::PreferLowercaseTitle as JestPreferLowercaseTitle;
 pub use crate::rules::jest::prefer_mock_promise_shorthand::PreferMockPromiseShorthand as JestPreferMockPromiseShorthand;
 pub use crate::rules::jest::prefer_mock_return_shorthand::PreferMockReturnShorthand as JestPreferMockReturnShorthand;
+pub use crate::rules::jest::prefer_snapshot_hint::PreferSnapshotHint as JestPreferSnapshotHint;
 pub use crate::rules::jest::prefer_spy_on::PreferSpyOn as JestPreferSpyOn;
 pub use crate::rules::jest::prefer_strict_equal::PreferStrictEqual as JestPreferStrictEqual;
 pub use crate::rules::jest::prefer_to_be::PreferToBe as JestPreferToBe;
@@ -1079,6 +1080,7 @@ pub enum RuleEnum {
     JestPreferLowercaseTitle(JestPreferLowercaseTitle),
     JestPreferMockPromiseShorthand(JestPreferMockPromiseShorthand),
     JestPreferMockReturnShorthand(JestPreferMockReturnShorthand),
+    JestPreferSnapshotHint(JestPreferSnapshotHint),
     JestPreferSpyOn(JestPreferSpyOn),
     JestPreferStrictEqual(JestPreferStrictEqual),
     JestPreferToBe(JestPreferToBe),
@@ -1835,7 +1837,8 @@ const JEST_PREFER_JEST_MOCKED_ID: usize = JEST_PREFER_HOOKS_ON_TOP_ID + 1usize;
 const JEST_PREFER_LOWERCASE_TITLE_ID: usize = JEST_PREFER_JEST_MOCKED_ID + 1usize;
 const JEST_PREFER_MOCK_PROMISE_SHORTHAND_ID: usize = JEST_PREFER_LOWERCASE_TITLE_ID + 1usize;
 const JEST_PREFER_MOCK_RETURN_SHORTHAND_ID: usize = JEST_PREFER_MOCK_PROMISE_SHORTHAND_ID + 1usize;
-const JEST_PREFER_SPY_ON_ID: usize = JEST_PREFER_MOCK_RETURN_SHORTHAND_ID + 1usize;
+const JEST_PREFER_SNAPSHOT_HINT_ID: usize = JEST_PREFER_MOCK_RETURN_SHORTHAND_ID + 1usize;
+const JEST_PREFER_SPY_ON_ID: usize = JEST_PREFER_SNAPSHOT_HINT_ID + 1usize;
 const JEST_PREFER_STRICT_EQUAL_ID: usize = JEST_PREFER_SPY_ON_ID + 1usize;
 const JEST_PREFER_TO_BE_ID: usize = JEST_PREFER_STRICT_EQUAL_ID + 1usize;
 const JEST_PREFER_TO_CONTAIN_ID: usize = JEST_PREFER_TO_BE_ID + 1usize;
@@ -2653,6 +2656,7 @@ impl RuleEnum {
             Self::JestPreferLowercaseTitle(_) => JEST_PREFER_LOWERCASE_TITLE_ID,
             Self::JestPreferMockPromiseShorthand(_) => JEST_PREFER_MOCK_PROMISE_SHORTHAND_ID,
             Self::JestPreferMockReturnShorthand(_) => JEST_PREFER_MOCK_RETURN_SHORTHAND_ID,
+            Self::JestPreferSnapshotHint(_) => JEST_PREFER_SNAPSHOT_HINT_ID,
             Self::JestPreferSpyOn(_) => JEST_PREFER_SPY_ON_ID,
             Self::JestPreferStrictEqual(_) => JEST_PREFER_STRICT_EQUAL_ID,
             Self::JestPreferToBe(_) => JEST_PREFER_TO_BE_ID,
@@ -3469,6 +3473,7 @@ impl RuleEnum {
             Self::JestPreferLowercaseTitle(_) => JestPreferLowercaseTitle::NAME,
             Self::JestPreferMockPromiseShorthand(_) => JestPreferMockPromiseShorthand::NAME,
             Self::JestPreferMockReturnShorthand(_) => JestPreferMockReturnShorthand::NAME,
+            Self::JestPreferSnapshotHint(_) => JestPreferSnapshotHint::NAME,
             Self::JestPreferSpyOn(_) => JestPreferSpyOn::NAME,
             Self::JestPreferStrictEqual(_) => JestPreferStrictEqual::NAME,
             Self::JestPreferToBe(_) => JestPreferToBe::NAME,
@@ -4301,6 +4306,7 @@ impl RuleEnum {
             Self::JestPreferLowercaseTitle(_) => JestPreferLowercaseTitle::CATEGORY,
             Self::JestPreferMockPromiseShorthand(_) => JestPreferMockPromiseShorthand::CATEGORY,
             Self::JestPreferMockReturnShorthand(_) => JestPreferMockReturnShorthand::CATEGORY,
+            Self::JestPreferSnapshotHint(_) => JestPreferSnapshotHint::CATEGORY,
             Self::JestPreferSpyOn(_) => JestPreferSpyOn::CATEGORY,
             Self::JestPreferStrictEqual(_) => JestPreferStrictEqual::CATEGORY,
             Self::JestPreferToBe(_) => JestPreferToBe::CATEGORY,
@@ -5136,6 +5142,7 @@ impl RuleEnum {
             Self::JestPreferLowercaseTitle(_) => JestPreferLowercaseTitle::FIX,
             Self::JestPreferMockPromiseShorthand(_) => JestPreferMockPromiseShorthand::FIX,
             Self::JestPreferMockReturnShorthand(_) => JestPreferMockReturnShorthand::FIX,
+            Self::JestPreferSnapshotHint(_) => JestPreferSnapshotHint::FIX,
             Self::JestPreferSpyOn(_) => JestPreferSpyOn::FIX,
             Self::JestPreferStrictEqual(_) => JestPreferStrictEqual::FIX,
             Self::JestPreferToBe(_) => JestPreferToBe::FIX,
@@ -6039,6 +6046,7 @@ impl RuleEnum {
             Self::JestPreferMockReturnShorthand(_) => {
                 JestPreferMockReturnShorthand::documentation()
             }
+            Self::JestPreferSnapshotHint(_) => JestPreferSnapshotHint::documentation(),
             Self::JestPreferSpyOn(_) => JestPreferSpyOn::documentation(),
             Self::JestPreferStrictEqual(_) => JestPreferStrictEqual::documentation(),
             Self::JestPreferToBe(_) => JestPreferToBe::documentation(),
@@ -7543,6 +7551,8 @@ impl RuleEnum {
                 JestPreferMockReturnShorthand::config_schema(generator)
                     .or_else(|| JestPreferMockReturnShorthand::schema(generator))
             }
+            Self::JestPreferSnapshotHint(_) => JestPreferSnapshotHint::config_schema(generator)
+                .or_else(|| JestPreferSnapshotHint::schema(generator)),
             Self::JestPreferSpyOn(_) => JestPreferSpyOn::config_schema(generator)
                 .or_else(|| JestPreferSpyOn::schema(generator)),
             Self::JestPreferStrictEqual(_) => JestPreferStrictEqual::config_schema(generator)
@@ -8914,6 +8924,7 @@ impl RuleEnum {
             Self::JestPreferLowercaseTitle(_) => "jest",
             Self::JestPreferMockPromiseShorthand(_) => "jest",
             Self::JestPreferMockReturnShorthand(_) => "jest",
+            Self::JestPreferSnapshotHint(_) => "jest",
             Self::JestPreferSpyOn(_) => "jest",
             Self::JestPreferStrictEqual(_) => "jest",
             Self::JestPreferToBe(_) => "jest",
@@ -10417,6 +10428,9 @@ impl RuleEnum {
             Self::JestPreferMockReturnShorthand(_) => Ok(Self::JestPreferMockReturnShorthand(
                 JestPreferMockReturnShorthand::from_configuration(value)?,
             )),
+            Self::JestPreferSnapshotHint(_) => {
+                Ok(Self::JestPreferSnapshotHint(JestPreferSnapshotHint::from_configuration(value)?))
+            }
             Self::JestPreferSpyOn(_) => {
                 Ok(Self::JestPreferSpyOn(JestPreferSpyOn::from_configuration(value)?))
             }
@@ -11907,6 +11921,7 @@ impl RuleEnum {
             Self::JestPreferLowercaseTitle(rule) => rule.to_configuration(),
             Self::JestPreferMockPromiseShorthand(rule) => rule.to_configuration(),
             Self::JestPreferMockReturnShorthand(rule) => rule.to_configuration(),
+            Self::JestPreferSnapshotHint(rule) => rule.to_configuration(),
             Self::JestPreferSpyOn(rule) => rule.to_configuration(),
             Self::JestPreferStrictEqual(rule) => rule.to_configuration(),
             Self::JestPreferToBe(rule) => rule.to_configuration(),
@@ -12621,6 +12636,7 @@ impl RuleEnum {
             Self::JestPreferLowercaseTitle(rule) => rule.run(node, ctx),
             Self::JestPreferMockPromiseShorthand(rule) => rule.run(node, ctx),
             Self::JestPreferMockReturnShorthand(rule) => rule.run(node, ctx),
+            Self::JestPreferSnapshotHint(rule) => rule.run(node, ctx),
             Self::JestPreferSpyOn(rule) => rule.run(node, ctx),
             Self::JestPreferStrictEqual(rule) => rule.run(node, ctx),
             Self::JestPreferToBe(rule) => rule.run(node, ctx),
@@ -13333,6 +13349,7 @@ impl RuleEnum {
             Self::JestPreferLowercaseTitle(rule) => rule.run_once(ctx),
             Self::JestPreferMockPromiseShorthand(rule) => rule.run_once(ctx),
             Self::JestPreferMockReturnShorthand(rule) => rule.run_once(ctx),
+            Self::JestPreferSnapshotHint(rule) => rule.run_once(ctx),
             Self::JestPreferSpyOn(rule) => rule.run_once(ctx),
             Self::JestPreferStrictEqual(rule) => rule.run_once(ctx),
             Self::JestPreferToBe(rule) => rule.run_once(ctx),
@@ -14113,6 +14130,7 @@ impl RuleEnum {
             Self::JestPreferLowercaseTitle(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::JestPreferMockPromiseShorthand(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::JestPreferMockReturnShorthand(rule) => rule.run_on_jest_node(jest_node, ctx),
+            Self::JestPreferSnapshotHint(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::JestPreferSpyOn(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::JestPreferStrictEqual(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::JestPreferToBe(rule) => rule.run_on_jest_node(jest_node, ctx),
@@ -14857,6 +14875,7 @@ impl RuleEnum {
             Self::JestPreferLowercaseTitle(rule) => rule.should_run(ctx),
             Self::JestPreferMockPromiseShorthand(rule) => rule.should_run(ctx),
             Self::JestPreferMockReturnShorthand(rule) => rule.should_run(ctx),
+            Self::JestPreferSnapshotHint(rule) => rule.should_run(ctx),
             Self::JestPreferSpyOn(rule) => rule.should_run(ctx),
             Self::JestPreferStrictEqual(rule) => rule.should_run(ctx),
             Self::JestPreferToBe(rule) => rule.should_run(ctx),
@@ -15727,6 +15746,7 @@ impl RuleEnum {
             Self::JestPreferMockReturnShorthand(_) => {
                 JestPreferMockReturnShorthand::IS_TSGOLINT_RULE
             }
+            Self::JestPreferSnapshotHint(_) => JestPreferSnapshotHint::IS_TSGOLINT_RULE,
             Self::JestPreferSpyOn(_) => JestPreferSpyOn::IS_TSGOLINT_RULE,
             Self::JestPreferStrictEqual(_) => JestPreferStrictEqual::IS_TSGOLINT_RULE,
             Self::JestPreferToBe(_) => JestPreferToBe::IS_TSGOLINT_RULE,
@@ -16686,6 +16706,7 @@ impl RuleEnum {
             Self::JestPreferLowercaseTitle(_) => JestPreferLowercaseTitle::HAS_CONFIG,
             Self::JestPreferMockPromiseShorthand(_) => JestPreferMockPromiseShorthand::HAS_CONFIG,
             Self::JestPreferMockReturnShorthand(_) => JestPreferMockReturnShorthand::HAS_CONFIG,
+            Self::JestPreferSnapshotHint(_) => JestPreferSnapshotHint::HAS_CONFIG,
             Self::JestPreferSpyOn(_) => JestPreferSpyOn::HAS_CONFIG,
             Self::JestPreferStrictEqual(_) => JestPreferStrictEqual::HAS_CONFIG,
             Self::JestPreferToBe(_) => JestPreferToBe::HAS_CONFIG,
@@ -17468,6 +17489,7 @@ impl RuleEnum {
             Self::JestPreferLowercaseTitle(rule) => rule.types_info(),
             Self::JestPreferMockPromiseShorthand(rule) => rule.types_info(),
             Self::JestPreferMockReturnShorthand(rule) => rule.types_info(),
+            Self::JestPreferSnapshotHint(rule) => rule.types_info(),
             Self::JestPreferSpyOn(rule) => rule.types_info(),
             Self::JestPreferStrictEqual(rule) => rule.types_info(),
             Self::JestPreferToBe(rule) => rule.types_info(),
@@ -18180,6 +18202,7 @@ impl RuleEnum {
             Self::JestPreferLowercaseTitle(rule) => rule.run_info(),
             Self::JestPreferMockPromiseShorthand(rule) => rule.run_info(),
             Self::JestPreferMockReturnShorthand(rule) => rule.run_info(),
+            Self::JestPreferSnapshotHint(rule) => rule.run_info(),
             Self::JestPreferSpyOn(rule) => rule.run_info(),
             Self::JestPreferStrictEqual(rule) => rule.run_info(),
             Self::JestPreferToBe(rule) => rule.run_info(),
@@ -18978,6 +19001,7 @@ pub static RULES: std::sync::LazyLock<Vec<RuleEnum>> = std::sync::LazyLock::new(
         RuleEnum::JestPreferLowercaseTitle(JestPreferLowercaseTitle::default()),
         RuleEnum::JestPreferMockPromiseShorthand(JestPreferMockPromiseShorthand::default()),
         RuleEnum::JestPreferMockReturnShorthand(JestPreferMockReturnShorthand::default()),
+        RuleEnum::JestPreferSnapshotHint(JestPreferSnapshotHint::default()),
         RuleEnum::JestPreferSpyOn(JestPreferSpyOn::default()),
         RuleEnum::JestPreferStrictEqual(JestPreferStrictEqual::default()),
         RuleEnum::JestPreferToBe(JestPreferToBe::default()),
