@@ -1,5 +1,9 @@
 use std::ops::Deref;
 
+use rustc_hash::FxHashMap;
+use schemars::JsonSchema;
+use serde::Deserialize;
+
 use oxc_ast::{
     AstKind,
     ast::{CallExpression, Expression},
@@ -8,9 +12,6 @@ use oxc_diagnostics::OxcDiagnostic;
 use oxc_macros::declare_oxc_lint;
 use oxc_semantic::NodeId;
 use oxc_span::Span;
-use rustc_hash::FxHashMap;
-use schemars::JsonSchema;
-use serde::Deserialize;
 
 use crate::{
     context::LintContext,
