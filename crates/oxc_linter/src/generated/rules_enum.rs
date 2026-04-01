@@ -1395,7 +1395,6 @@ pub enum RuleEnum {
     PromisePreferCatch(PromisePreferCatch),
     PromiseSpecOnly(PromiseSpecOnly),
     PromiseValidParams(PromiseValidParams),
-    VitestPreferImportingVitestGlobals(VitestPreferImportingVitestGlobals),
     VitestConsistentEachFor(VitestConsistentEachFor),
     VitestConsistentTestFilename(VitestConsistentTestFilename),
     VitestConsistentVitestVi(VitestConsistentVitestVi),
@@ -1409,6 +1408,7 @@ pub enum RuleEnum {
     VitestPreferDescribeFunctionTitle(VitestPreferDescribeFunctionTitle),
     VitestPreferExpectTypeOf(VitestPreferExpectTypeOf),
     VitestPreferImportInMock(VitestPreferImportInMock),
+    VitestPreferImportingVitestGlobals(VitestPreferImportingVitestGlobals),
     VitestPreferStrictBooleanMatchers(VitestPreferStrictBooleanMatchers),
     VitestPreferToBeFalsy(VitestPreferToBeFalsy),
     VitestPreferToBeObject(VitestPreferToBeObject),
@@ -2191,8 +2191,7 @@ const PROMISE_PREFER_AWAIT_TO_THEN_ID: usize = PROMISE_PREFER_AWAIT_TO_CALLBACKS
 const PROMISE_PREFER_CATCH_ID: usize = PROMISE_PREFER_AWAIT_TO_THEN_ID + 1usize;
 const PROMISE_SPEC_ONLY_ID: usize = PROMISE_PREFER_CATCH_ID + 1usize;
 const PROMISE_VALID_PARAMS_ID: usize = PROMISE_SPEC_ONLY_ID + 1usize;
-const VITEST_PREFER_IMPORTING_VITEST_GLOBALS_ID: usize = PROMISE_VALID_PARAMS_ID + 1usize;
-const VITEST_CONSISTENT_EACH_FOR_ID: usize = VITEST_PREFER_IMPORTING_VITEST_GLOBALS_ID + 1usize;
+const VITEST_CONSISTENT_EACH_FOR_ID: usize = PROMISE_VALID_PARAMS_ID + 1usize;
 const VITEST_CONSISTENT_TEST_FILENAME_ID: usize = VITEST_CONSISTENT_EACH_FOR_ID + 1usize;
 const VITEST_CONSISTENT_VITEST_VI_ID: usize = VITEST_CONSISTENT_TEST_FILENAME_ID + 1usize;
 const VITEST_HOISTED_APIS_ON_TOP_ID: usize = VITEST_CONSISTENT_VITEST_VI_ID + 1usize;
@@ -2206,7 +2205,9 @@ const VITEST_PREFER_CALLED_TIMES_ID: usize = VITEST_PREFER_CALLED_ONCE_ID + 1usi
 const VITEST_PREFER_DESCRIBE_FUNCTION_TITLE_ID: usize = VITEST_PREFER_CALLED_TIMES_ID + 1usize;
 const VITEST_PREFER_EXPECT_TYPE_OF_ID: usize = VITEST_PREFER_DESCRIBE_FUNCTION_TITLE_ID + 1usize;
 const VITEST_PREFER_IMPORT_IN_MOCK_ID: usize = VITEST_PREFER_EXPECT_TYPE_OF_ID + 1usize;
-const VITEST_PREFER_STRICT_BOOLEAN_MATCHERS_ID: usize = VITEST_PREFER_IMPORT_IN_MOCK_ID + 1usize;
+const VITEST_PREFER_IMPORTING_VITEST_GLOBALS_ID: usize = VITEST_PREFER_IMPORT_IN_MOCK_ID + 1usize;
+const VITEST_PREFER_STRICT_BOOLEAN_MATCHERS_ID: usize =
+    VITEST_PREFER_IMPORTING_VITEST_GLOBALS_ID + 1usize;
 const VITEST_PREFER_TO_BE_FALSY_ID: usize = VITEST_PREFER_STRICT_BOOLEAN_MATCHERS_ID + 1usize;
 const VITEST_PREFER_TO_BE_OBJECT_ID: usize = VITEST_PREFER_TO_BE_FALSY_ID + 1usize;
 const VITEST_PREFER_TO_BE_TRUTHY_ID: usize = VITEST_PREFER_TO_BE_OBJECT_ID + 1usize;
@@ -3014,9 +3015,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(_) => PROMISE_PREFER_CATCH_ID,
             Self::PromiseSpecOnly(_) => PROMISE_SPEC_ONLY_ID,
             Self::PromiseValidParams(_) => PROMISE_VALID_PARAMS_ID,
-            Self::VitestPreferImportingVitestGlobals(_) => {
-                VITEST_PREFER_IMPORTING_VITEST_GLOBALS_ID
-            }
             Self::VitestConsistentEachFor(_) => VITEST_CONSISTENT_EACH_FOR_ID,
             Self::VitestConsistentTestFilename(_) => VITEST_CONSISTENT_TEST_FILENAME_ID,
             Self::VitestConsistentVitestVi(_) => VITEST_CONSISTENT_VITEST_VI_ID,
@@ -3030,6 +3028,9 @@ impl RuleEnum {
             Self::VitestPreferDescribeFunctionTitle(_) => VITEST_PREFER_DESCRIBE_FUNCTION_TITLE_ID,
             Self::VitestPreferExpectTypeOf(_) => VITEST_PREFER_EXPECT_TYPE_OF_ID,
             Self::VitestPreferImportInMock(_) => VITEST_PREFER_IMPORT_IN_MOCK_ID,
+            Self::VitestPreferImportingVitestGlobals(_) => {
+                VITEST_PREFER_IMPORTING_VITEST_GLOBALS_ID
+            }
             Self::VitestPreferStrictBooleanMatchers(_) => VITEST_PREFER_STRICT_BOOLEAN_MATCHERS_ID,
             Self::VitestPreferToBeFalsy(_) => VITEST_PREFER_TO_BE_FALSY_ID,
             Self::VitestPreferToBeObject(_) => VITEST_PREFER_TO_BE_OBJECT_ID,
@@ -3827,7 +3828,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(_) => PromisePreferCatch::NAME,
             Self::PromiseSpecOnly(_) => PromiseSpecOnly::NAME,
             Self::PromiseValidParams(_) => PromiseValidParams::NAME,
-            Self::VitestPreferImportingVitestGlobals(_) => VitestPreferImportingVitestGlobals::NAME,
             Self::VitestConsistentEachFor(_) => VitestConsistentEachFor::NAME,
             Self::VitestConsistentTestFilename(_) => VitestConsistentTestFilename::NAME,
             Self::VitestConsistentVitestVi(_) => VitestConsistentVitestVi::NAME,
@@ -3841,6 +3841,7 @@ impl RuleEnum {
             Self::VitestPreferDescribeFunctionTitle(_) => VitestPreferDescribeFunctionTitle::NAME,
             Self::VitestPreferExpectTypeOf(_) => VitestPreferExpectTypeOf::NAME,
             Self::VitestPreferImportInMock(_) => VitestPreferImportInMock::NAME,
+            Self::VitestPreferImportingVitestGlobals(_) => VitestPreferImportingVitestGlobals::NAME,
             Self::VitestPreferStrictBooleanMatchers(_) => VitestPreferStrictBooleanMatchers::NAME,
             Self::VitestPreferToBeFalsy(_) => VitestPreferToBeFalsy::NAME,
             Self::VitestPreferToBeObject(_) => VitestPreferToBeObject::NAME,
@@ -4680,9 +4681,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(_) => PromisePreferCatch::CATEGORY,
             Self::PromiseSpecOnly(_) => PromiseSpecOnly::CATEGORY,
             Self::PromiseValidParams(_) => PromiseValidParams::CATEGORY,
-            Self::VitestPreferImportingVitestGlobals(_) => {
-                VitestPreferImportingVitestGlobals::CATEGORY
-            }
             Self::VitestConsistentEachFor(_) => VitestConsistentEachFor::CATEGORY,
             Self::VitestConsistentTestFilename(_) => VitestConsistentTestFilename::CATEGORY,
             Self::VitestConsistentVitestVi(_) => VitestConsistentVitestVi::CATEGORY,
@@ -4700,6 +4698,9 @@ impl RuleEnum {
             }
             Self::VitestPreferExpectTypeOf(_) => VitestPreferExpectTypeOf::CATEGORY,
             Self::VitestPreferImportInMock(_) => VitestPreferImportInMock::CATEGORY,
+            Self::VitestPreferImportingVitestGlobals(_) => {
+                VitestPreferImportingVitestGlobals::CATEGORY
+            }
             Self::VitestPreferStrictBooleanMatchers(_) => {
                 VitestPreferStrictBooleanMatchers::CATEGORY
             }
@@ -5502,7 +5503,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(_) => PromisePreferCatch::FIX,
             Self::PromiseSpecOnly(_) => PromiseSpecOnly::FIX,
             Self::PromiseValidParams(_) => PromiseValidParams::FIX,
-            Self::VitestPreferImportingVitestGlobals(_) => VitestPreferImportingVitestGlobals::FIX,
             Self::VitestConsistentEachFor(_) => VitestConsistentEachFor::FIX,
             Self::VitestConsistentTestFilename(_) => VitestConsistentTestFilename::FIX,
             Self::VitestConsistentVitestVi(_) => VitestConsistentVitestVi::FIX,
@@ -5516,6 +5516,7 @@ impl RuleEnum {
             Self::VitestPreferDescribeFunctionTitle(_) => VitestPreferDescribeFunctionTitle::FIX,
             Self::VitestPreferExpectTypeOf(_) => VitestPreferExpectTypeOf::FIX,
             Self::VitestPreferImportInMock(_) => VitestPreferImportInMock::FIX,
+            Self::VitestPreferImportingVitestGlobals(_) => VitestPreferImportingVitestGlobals::FIX,
             Self::VitestPreferStrictBooleanMatchers(_) => VitestPreferStrictBooleanMatchers::FIX,
             Self::VitestPreferToBeFalsy(_) => VitestPreferToBeFalsy::FIX,
             Self::VitestPreferToBeObject(_) => VitestPreferToBeObject::FIX,
@@ -6508,9 +6509,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(_) => PromisePreferCatch::documentation(),
             Self::PromiseSpecOnly(_) => PromiseSpecOnly::documentation(),
             Self::PromiseValidParams(_) => PromiseValidParams::documentation(),
-            Self::VitestPreferImportingVitestGlobals(_) => {
-                VitestPreferImportingVitestGlobals::documentation()
-            }
             Self::VitestConsistentEachFor(_) => VitestConsistentEachFor::documentation(),
             Self::VitestConsistentTestFilename(_) => VitestConsistentTestFilename::documentation(),
             Self::VitestConsistentVitestVi(_) => VitestConsistentVitestVi::documentation(),
@@ -6530,6 +6528,9 @@ impl RuleEnum {
             }
             Self::VitestPreferExpectTypeOf(_) => VitestPreferExpectTypeOf::documentation(),
             Self::VitestPreferImportInMock(_) => VitestPreferImportInMock::documentation(),
+            Self::VitestPreferImportingVitestGlobals(_) => {
+                VitestPreferImportingVitestGlobals::documentation()
+            }
             Self::VitestPreferStrictBooleanMatchers(_) => {
                 VitestPreferStrictBooleanMatchers::documentation()
             }
@@ -8472,10 +8473,6 @@ impl RuleEnum {
                 .or_else(|| PromiseSpecOnly::schema(generator)),
             Self::PromiseValidParams(_) => PromiseValidParams::config_schema(generator)
                 .or_else(|| PromiseValidParams::schema(generator)),
-            Self::VitestPreferImportingVitestGlobals(_) => {
-                VitestPreferImportingVitestGlobals::config_schema(generator)
-                    .or_else(|| VitestPreferImportingVitestGlobals::schema(generator))
-            }
             Self::VitestConsistentEachFor(_) => VitestConsistentEachFor::config_schema(generator)
                 .or_else(|| VitestConsistentEachFor::schema(generator)),
             Self::VitestConsistentTestFilename(_) => {
@@ -8510,6 +8507,10 @@ impl RuleEnum {
                 .or_else(|| VitestPreferExpectTypeOf::schema(generator)),
             Self::VitestPreferImportInMock(_) => VitestPreferImportInMock::config_schema(generator)
                 .or_else(|| VitestPreferImportInMock::schema(generator)),
+            Self::VitestPreferImportingVitestGlobals(_) => {
+                VitestPreferImportingVitestGlobals::config_schema(generator)
+                    .or_else(|| VitestPreferImportingVitestGlobals::schema(generator))
+            }
             Self::VitestPreferStrictBooleanMatchers(_) => {
                 VitestPreferStrictBooleanMatchers::config_schema(generator)
                     .or_else(|| VitestPreferStrictBooleanMatchers::schema(generator))
@@ -9270,7 +9271,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(_) => "promise",
             Self::PromiseSpecOnly(_) => "promise",
             Self::PromiseValidParams(_) => "promise",
-            Self::VitestPreferImportingVitestGlobals(_) => "vitest",
             Self::VitestConsistentEachFor(_) => "vitest",
             Self::VitestConsistentTestFilename(_) => "vitest",
             Self::VitestConsistentVitestVi(_) => "vitest",
@@ -9284,6 +9284,7 @@ impl RuleEnum {
             Self::VitestPreferDescribeFunctionTitle(_) => "vitest",
             Self::VitestPreferExpectTypeOf(_) => "vitest",
             Self::VitestPreferImportInMock(_) => "vitest",
+            Self::VitestPreferImportingVitestGlobals(_) => "vitest",
             Self::VitestPreferStrictBooleanMatchers(_) => "vitest",
             Self::VitestPreferToBeFalsy(_) => "vitest",
             Self::VitestPreferToBeObject(_) => "vitest",
@@ -11458,11 +11459,6 @@ impl RuleEnum {
             Self::PromiseValidParams(_) => {
                 Ok(Self::PromiseValidParams(PromiseValidParams::from_configuration(value)?))
             }
-            Self::VitestPreferImportingVitestGlobals(_) => {
-                Ok(Self::VitestPreferImportingVitestGlobals(
-                    VitestPreferImportingVitestGlobals::from_configuration(value)?,
-                ))
-            }
             Self::VitestConsistentEachFor(_) => Ok(Self::VitestConsistentEachFor(
                 VitestConsistentEachFor::from_configuration(value)?,
             )),
@@ -11506,6 +11502,11 @@ impl RuleEnum {
             Self::VitestPreferImportInMock(_) => Ok(Self::VitestPreferImportInMock(
                 VitestPreferImportInMock::from_configuration(value)?,
             )),
+            Self::VitestPreferImportingVitestGlobals(_) => {
+                Ok(Self::VitestPreferImportingVitestGlobals(
+                    VitestPreferImportingVitestGlobals::from_configuration(value)?,
+                ))
+            }
             Self::VitestPreferStrictBooleanMatchers(_) => {
                 Ok(Self::VitestPreferStrictBooleanMatchers(
                     VitestPreferStrictBooleanMatchers::from_configuration(value)?,
@@ -12277,7 +12278,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(rule) => rule.to_configuration(),
             Self::PromiseSpecOnly(rule) => rule.to_configuration(),
             Self::PromiseValidParams(rule) => rule.to_configuration(),
-            Self::VitestPreferImportingVitestGlobals(rule) => rule.to_configuration(),
             Self::VitestConsistentEachFor(rule) => rule.to_configuration(),
             Self::VitestConsistentTestFilename(rule) => rule.to_configuration(),
             Self::VitestConsistentVitestVi(rule) => rule.to_configuration(),
@@ -12291,6 +12291,7 @@ impl RuleEnum {
             Self::VitestPreferDescribeFunctionTitle(rule) => rule.to_configuration(),
             Self::VitestPreferExpectTypeOf(rule) => rule.to_configuration(),
             Self::VitestPreferImportInMock(rule) => rule.to_configuration(),
+            Self::VitestPreferImportingVitestGlobals(rule) => rule.to_configuration(),
             Self::VitestPreferStrictBooleanMatchers(rule) => rule.to_configuration(),
             Self::VitestPreferToBeFalsy(rule) => rule.to_configuration(),
             Self::VitestPreferToBeObject(rule) => rule.to_configuration(),
@@ -12994,7 +12995,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(rule) => rule.run(node, ctx),
             Self::PromiseSpecOnly(rule) => rule.run(node, ctx),
             Self::PromiseValidParams(rule) => rule.run(node, ctx),
-            Self::VitestPreferImportingVitestGlobals(rule) => rule.run(node, ctx),
             Self::VitestConsistentEachFor(rule) => rule.run(node, ctx),
             Self::VitestConsistentTestFilename(rule) => rule.run(node, ctx),
             Self::VitestConsistentVitestVi(rule) => rule.run(node, ctx),
@@ -13008,6 +13008,7 @@ impl RuleEnum {
             Self::VitestPreferDescribeFunctionTitle(rule) => rule.run(node, ctx),
             Self::VitestPreferExpectTypeOf(rule) => rule.run(node, ctx),
             Self::VitestPreferImportInMock(rule) => rule.run(node, ctx),
+            Self::VitestPreferImportingVitestGlobals(rule) => rule.run(node, ctx),
             Self::VitestPreferStrictBooleanMatchers(rule) => rule.run(node, ctx),
             Self::VitestPreferToBeFalsy(rule) => rule.run(node, ctx),
             Self::VitestPreferToBeObject(rule) => rule.run(node, ctx),
@@ -13709,7 +13710,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(rule) => rule.run_once(ctx),
             Self::PromiseSpecOnly(rule) => rule.run_once(ctx),
             Self::PromiseValidParams(rule) => rule.run_once(ctx),
-            Self::VitestPreferImportingVitestGlobals(rule) => rule.run_once(ctx),
             Self::VitestConsistentEachFor(rule) => rule.run_once(ctx),
             Self::VitestConsistentTestFilename(rule) => rule.run_once(ctx),
             Self::VitestConsistentVitestVi(rule) => rule.run_once(ctx),
@@ -13723,6 +13723,7 @@ impl RuleEnum {
             Self::VitestPreferDescribeFunctionTitle(rule) => rule.run_once(ctx),
             Self::VitestPreferExpectTypeOf(rule) => rule.run_once(ctx),
             Self::VitestPreferImportInMock(rule) => rule.run_once(ctx),
+            Self::VitestPreferImportingVitestGlobals(rule) => rule.run_once(ctx),
             Self::VitestPreferStrictBooleanMatchers(rule) => rule.run_once(ctx),
             Self::VitestPreferToBeFalsy(rule) => rule.run_once(ctx),
             Self::VitestPreferToBeObject(rule) => rule.run_once(ctx),
@@ -14522,7 +14523,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::PromiseSpecOnly(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::PromiseValidParams(rule) => rule.run_on_jest_node(jest_node, ctx),
-            Self::VitestPreferImportingVitestGlobals(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestConsistentEachFor(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestConsistentTestFilename(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestConsistentVitestVi(rule) => rule.run_on_jest_node(jest_node, ctx),
@@ -14536,6 +14536,7 @@ impl RuleEnum {
             Self::VitestPreferDescribeFunctionTitle(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferExpectTypeOf(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferImportInMock(rule) => rule.run_on_jest_node(jest_node, ctx),
+            Self::VitestPreferImportingVitestGlobals(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferStrictBooleanMatchers(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferToBeFalsy(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferToBeObject(rule) => rule.run_on_jest_node(jest_node, ctx),
@@ -15239,7 +15240,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(rule) => rule.should_run(ctx),
             Self::PromiseSpecOnly(rule) => rule.should_run(ctx),
             Self::PromiseValidParams(rule) => rule.should_run(ctx),
-            Self::VitestPreferImportingVitestGlobals(rule) => rule.should_run(ctx),
             Self::VitestConsistentEachFor(rule) => rule.should_run(ctx),
             Self::VitestConsistentTestFilename(rule) => rule.should_run(ctx),
             Self::VitestConsistentVitestVi(rule) => rule.should_run(ctx),
@@ -15253,6 +15253,7 @@ impl RuleEnum {
             Self::VitestPreferDescribeFunctionTitle(rule) => rule.should_run(ctx),
             Self::VitestPreferExpectTypeOf(rule) => rule.should_run(ctx),
             Self::VitestPreferImportInMock(rule) => rule.should_run(ctx),
+            Self::VitestPreferImportingVitestGlobals(rule) => rule.should_run(ctx),
             Self::VitestPreferStrictBooleanMatchers(rule) => rule.should_run(ctx),
             Self::VitestPreferToBeFalsy(rule) => rule.should_run(ctx),
             Self::VitestPreferToBeObject(rule) => rule.should_run(ctx),
@@ -16242,9 +16243,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(_) => PromisePreferCatch::IS_TSGOLINT_RULE,
             Self::PromiseSpecOnly(_) => PromiseSpecOnly::IS_TSGOLINT_RULE,
             Self::PromiseValidParams(_) => PromiseValidParams::IS_TSGOLINT_RULE,
-            Self::VitestPreferImportingVitestGlobals(_) => {
-                VitestPreferImportingVitestGlobals::IS_TSGOLINT_RULE
-            }
             Self::VitestConsistentEachFor(_) => VitestConsistentEachFor::IS_TSGOLINT_RULE,
             Self::VitestConsistentTestFilename(_) => VitestConsistentTestFilename::IS_TSGOLINT_RULE,
             Self::VitestConsistentVitestVi(_) => VitestConsistentVitestVi::IS_TSGOLINT_RULE,
@@ -16264,6 +16262,9 @@ impl RuleEnum {
             }
             Self::VitestPreferExpectTypeOf(_) => VitestPreferExpectTypeOf::IS_TSGOLINT_RULE,
             Self::VitestPreferImportInMock(_) => VitestPreferImportInMock::IS_TSGOLINT_RULE,
+            Self::VitestPreferImportingVitestGlobals(_) => {
+                VitestPreferImportingVitestGlobals::IS_TSGOLINT_RULE
+            }
             Self::VitestPreferStrictBooleanMatchers(_) => {
                 VitestPreferStrictBooleanMatchers::IS_TSGOLINT_RULE
             }
@@ -17138,9 +17139,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(_) => PromisePreferCatch::HAS_CONFIG,
             Self::PromiseSpecOnly(_) => PromiseSpecOnly::HAS_CONFIG,
             Self::PromiseValidParams(_) => PromiseValidParams::HAS_CONFIG,
-            Self::VitestPreferImportingVitestGlobals(_) => {
-                VitestPreferImportingVitestGlobals::HAS_CONFIG
-            }
             Self::VitestConsistentEachFor(_) => VitestConsistentEachFor::HAS_CONFIG,
             Self::VitestConsistentTestFilename(_) => VitestConsistentTestFilename::HAS_CONFIG,
             Self::VitestConsistentVitestVi(_) => VitestConsistentVitestVi::HAS_CONFIG,
@@ -17158,6 +17156,9 @@ impl RuleEnum {
             }
             Self::VitestPreferExpectTypeOf(_) => VitestPreferExpectTypeOf::HAS_CONFIG,
             Self::VitestPreferImportInMock(_) => VitestPreferImportInMock::HAS_CONFIG,
+            Self::VitestPreferImportingVitestGlobals(_) => {
+                VitestPreferImportingVitestGlobals::HAS_CONFIG
+            }
             Self::VitestPreferStrictBooleanMatchers(_) => {
                 VitestPreferStrictBooleanMatchers::HAS_CONFIG
             }
@@ -17865,7 +17866,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(rule) => rule.types_info(),
             Self::PromiseSpecOnly(rule) => rule.types_info(),
             Self::PromiseValidParams(rule) => rule.types_info(),
-            Self::VitestPreferImportingVitestGlobals(rule) => rule.types_info(),
             Self::VitestConsistentEachFor(rule) => rule.types_info(),
             Self::VitestConsistentTestFilename(rule) => rule.types_info(),
             Self::VitestConsistentVitestVi(rule) => rule.types_info(),
@@ -17879,6 +17879,7 @@ impl RuleEnum {
             Self::VitestPreferDescribeFunctionTitle(rule) => rule.types_info(),
             Self::VitestPreferExpectTypeOf(rule) => rule.types_info(),
             Self::VitestPreferImportInMock(rule) => rule.types_info(),
+            Self::VitestPreferImportingVitestGlobals(rule) => rule.types_info(),
             Self::VitestPreferStrictBooleanMatchers(rule) => rule.types_info(),
             Self::VitestPreferToBeFalsy(rule) => rule.types_info(),
             Self::VitestPreferToBeObject(rule) => rule.types_info(),
@@ -18580,7 +18581,6 @@ impl RuleEnum {
             Self::PromisePreferCatch(rule) => rule.run_info(),
             Self::PromiseSpecOnly(rule) => rule.run_info(),
             Self::PromiseValidParams(rule) => rule.run_info(),
-            Self::VitestPreferImportingVitestGlobals(rule) => rule.run_info(),
             Self::VitestConsistentEachFor(rule) => rule.run_info(),
             Self::VitestConsistentTestFilename(rule) => rule.run_info(),
             Self::VitestConsistentVitestVi(rule) => rule.run_info(),
@@ -18594,6 +18594,7 @@ impl RuleEnum {
             Self::VitestPreferDescribeFunctionTitle(rule) => rule.run_info(),
             Self::VitestPreferExpectTypeOf(rule) => rule.run_info(),
             Self::VitestPreferImportInMock(rule) => rule.run_info(),
+            Self::VitestPreferImportingVitestGlobals(rule) => rule.run_info(),
             Self::VitestPreferStrictBooleanMatchers(rule) => rule.run_info(),
             Self::VitestPreferToBeFalsy(rule) => rule.run_info(),
             Self::VitestPreferToBeObject(rule) => rule.run_info(),
@@ -19411,7 +19412,6 @@ pub static RULES: std::sync::LazyLock<Vec<RuleEnum>> = std::sync::LazyLock::new(
         RuleEnum::PromisePreferCatch(PromisePreferCatch::default()),
         RuleEnum::PromiseSpecOnly(PromiseSpecOnly::default()),
         RuleEnum::PromiseValidParams(PromiseValidParams::default()),
-        RuleEnum::VitestPreferImportingVitestGlobals(VitestPreferImportingVitestGlobals::default()),
         RuleEnum::VitestConsistentEachFor(VitestConsistentEachFor::default()),
         RuleEnum::VitestConsistentTestFilename(VitestConsistentTestFilename::default()),
         RuleEnum::VitestConsistentVitestVi(VitestConsistentVitestVi::default()),
@@ -19425,6 +19425,7 @@ pub static RULES: std::sync::LazyLock<Vec<RuleEnum>> = std::sync::LazyLock::new(
         RuleEnum::VitestPreferDescribeFunctionTitle(VitestPreferDescribeFunctionTitle::default()),
         RuleEnum::VitestPreferExpectTypeOf(VitestPreferExpectTypeOf::default()),
         RuleEnum::VitestPreferImportInMock(VitestPreferImportInMock::default()),
+        RuleEnum::VitestPreferImportingVitestGlobals(VitestPreferImportingVitestGlobals::default()),
         RuleEnum::VitestPreferStrictBooleanMatchers(VitestPreferStrictBooleanMatchers::default()),
         RuleEnum::VitestPreferToBeFalsy(VitestPreferToBeFalsy::default()),
         RuleEnum::VitestPreferToBeObject(VitestPreferToBeObject::default()),
