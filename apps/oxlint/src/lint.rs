@@ -1886,4 +1886,13 @@ mod suppression {
             .with_backup_file(false)
             .test(&["--suppress-all", "--type-check"]);
     }
+
+    #[test]
+    fn test_warnings_not_suppressed() {
+        SuppressionTester::new()
+            .with_cwd("warnings_not_suppressed")
+            .with_setup_file(false)
+            .with_expected_file(true)
+            .test(&["--suppress-all"]);
+    }
 }

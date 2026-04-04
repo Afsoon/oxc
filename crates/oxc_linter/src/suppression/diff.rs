@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use oxc_diagnostics::Severity;
 use rustc_hash::FxHashMap;
 
 use crate::{
@@ -97,6 +98,11 @@ impl DiffManager {
             let mut suppression_tracking: FxHashMap<RuleName, DiagnosticCounts> =
                 FxHashMap::default();
             for message in diagnostics {
+                // Only count errors, not warnings (matches ESLint behavior)
+                if message.error.severity != Severity::Error {
+                    continue;
+                }
+
                 let Ok(key) = RuleName::try_from(message) else {
                     continue;
                 };
@@ -124,6 +130,11 @@ impl DiffManager {
                 let diagnostics_filtered = lint_diagnostics
                     .into_iter()
                     .filter(|message| {
+                        // Only suppress errors, never warnings
+                        if message.error.severity != Severity::Error {
+                            return true;
+                        }
+
                         let Ok(key) = RuleName::try_from(message) else {
                             return true;
                         };
