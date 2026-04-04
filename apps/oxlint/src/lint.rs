@@ -341,12 +341,11 @@ impl CliRunner {
         let mut options =
             LintServiceOptions::new(self.cwd.clone()).with_cross_module(use_cross_module);
 
-        let (mut suppression_manager, suppression_sender) = SuppressionManager::load(
+        let mut suppression_manager = SuppressionManager::load(
             options.cwd(),
             "oxlint-suppressions.json",
             suppression_options.suppress_all,
             suppression_options.prune_suppressions || fix_options.is_enabled(),
-            &lint_config,
         );
 
         let config_store = ConfigStore::new(lint_config, nested_configs, external_plugin_store);
@@ -430,6 +429,8 @@ impl CliRunner {
 
         let number_of_rules = linter.number_of_rules(type_aware);
 
+        let cwd = options.cwd().to_path_buf();
+
         // Create the LintRunner
         // TODO: Add a warning message if `tsgolint` cannot be found, but type-aware rules are enabled
         let lint_runner = match LintRunner::builder(options, linter)
@@ -446,12 +447,9 @@ impl CliRunner {
             }
         };
 
-        match lint_runner.lint_files(
-            &files_to_lint,
-            tx_error.clone(),
-            &suppression_manager,
-            suppression_sender.clone(),
-        ) {
+        let diff_manager = suppression_manager.build_diff();
+
+        match lint_runner.lint_files(&files_to_lint, tx_error.clone(), &diff_manager) {
             Ok(lint_runner) => {
                 lint_runner.report_unused_directives(report_unused_directives, &tx_error);
             }
@@ -461,10 +459,10 @@ impl CliRunner {
             }
         }
 
-        drop(tx_error);
-        drop(suppression_sender);
+        let result = suppression_manager.finalize(diff_manager, &tx_error, &cwd);
 
-        let result = suppression_manager.report_suppression();
+        drop(tx_error);
+
         let diagnostic_result = diagnostic_service.run(stdout);
 
         let oxlint_suppression_file_action = if let Err(report_suppression_error) = result {

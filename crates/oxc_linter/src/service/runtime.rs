@@ -32,7 +32,7 @@ use crate::{
     disable_directives::DisableDirectives,
     loader::{JavaScriptSource, LINT_PARTIAL_LOADER_EXTENSIONS, PartialLoader},
     module_record::ModuleRecord,
-    suppression::{SuppressionManager, SuppressionSender},
+    suppression::DiffManager,
     utils::read_to_arena_str,
 };
 
@@ -587,13 +587,10 @@ impl Runtime {
         file_system: &(dyn RuntimeFileSystem + Sync + Send),
         paths: Vec<Arc<OsStr>>,
         tx_error: &DiagnosticSender,
-        suppression_manager: &SuppressionManager,
-        suppression_sender: &SuppressionSender,
+        diff_manager: &Arc<DiffManager>,
     ) {
         self.modules_by_path.pin().reserve(paths.len());
         let paths_set: IndexSet<Arc<OsStr>, FxBuildHasher> = paths.into_iter().collect();
-
-        let diff_manager = suppression_manager.build_diff(false);
 
         rayon::scope(|scope| {
             self.resolve_modules(
@@ -687,13 +684,7 @@ impl Runtime {
                         }
 
                         if !diff_manager.skip() {
-                            messages = diff_manager.diff_file(
-                                path,
-                                &self.cwd,
-                                messages,
-                                tx_error,
-                                &suppression_sender.clone(),
-                            );
+                            messages = diff_manager.collect_file(path, &self.cwd, messages);
                         }
 
                         if !messages.is_empty() {
