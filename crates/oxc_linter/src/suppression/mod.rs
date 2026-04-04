@@ -79,10 +79,11 @@ pub struct SuppressionManager {
 
 impl SuppressionManager {
     pub fn load(cwd: &Path, file_path: &str, suppress_all: bool, prune_suppression: bool) -> Self {
-        let path = cwd.join(file_path);
+        let suppression_file_path = cwd.join(file_path);
+        let file_exists = suppression_file_path.exists();
 
-        if !path.exists() {
-            let manager_status = if suppress_all || prune_suppression {
+        if !file_exists {
+            let file_action = if suppress_all || prune_suppression {
                 OxlintSuppressionFileAction::Created
             } else {
                 OxlintSuppressionFileAction::None
@@ -96,30 +97,30 @@ impl SuppressionManager {
 
             return Self {
                 suppressions_by_file,
-                file_action: manager_status,
-                file_exists: false,
-                suppression_file_path: path,
-                prune_suppression,
+                file_action,
+                suppression_file_path,
                 suppress_all,
+                prune_suppression,
+                file_exists,
             };
         }
 
-        match SuppressionTracking::from_file(&path, cwd) {
+        match SuppressionTracking::from_file(&suppression_file_path, cwd) {
             Ok(suppression_file) => Self {
                 suppressions_by_file: Some(suppression_file),
                 file_action: OxlintSuppressionFileAction::Exists,
-                suppression_file_path: path,
-                file_exists: true,
-                prune_suppression,
+                suppression_file_path,
                 suppress_all,
+                prune_suppression,
+                file_exists,
             },
             Err(err) => Self {
                 suppressions_by_file: None,
                 file_action: OxlintSuppressionFileAction::Malformed(err),
-                suppression_file_path: path,
-                file_exists: true,
-                prune_suppression,
+                suppression_file_path,
                 suppress_all,
+                prune_suppression,
+                file_exists,
             },
         }
     }
