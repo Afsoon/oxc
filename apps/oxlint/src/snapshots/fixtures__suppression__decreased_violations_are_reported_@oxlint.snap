@@ -6,8 +6,8 @@ arguments:
 working directory: fixtures/suppression/decreased_violations_are_reported
 ----------
 
-  x The number of 'eslint/no-console' errors in folder_b/test.js decreased from 3 to 1.
-  help: Update `oxlint-suppressions.json` file running `oxlint --prune-suppressions`
+  x There are suppressions that do not occur anymore.
+  help: Run `oxlint --prune-suppressions` to remove unused suppressions.
 
 Found 0 warnings and 1 error.
 Finished in <variable>ms on 1 file with 56 rules using 1 threads.

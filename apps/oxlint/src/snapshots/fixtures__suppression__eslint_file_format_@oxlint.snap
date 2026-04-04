@@ -6,8 +6,8 @@ arguments:
 working directory: fixtures/suppression/eslint_file_format
 ----------
 
-  x The number of 'eslint/no-console' errors in test.js increased from 1 to 3.
-  help: Update `oxlint-suppressions.json` file running `oxlint --suppress-all`
+  x There are new violations not covered by the suppressions file.
+  help: Run `oxlint --suppress-all` to update the suppressions file.
 
   x eslint(no-console): Unexpected console statement.
    ,-[test.js:1:1]
