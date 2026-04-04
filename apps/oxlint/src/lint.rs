@@ -466,7 +466,7 @@ impl CliRunner {
         let oxlint_suppression_file_action = if let Err(report_suppression_error) = result {
             OxlintSuppressionFileAction::UnableToPerformFsOperation(report_suppression_error)
         } else {
-            suppression_manager.manager_status
+            suppression_manager.file_action
         };
 
         if let Some(end) = output_formatter.lint_command_info(&LintCommandInfo {

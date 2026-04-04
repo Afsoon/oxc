@@ -69,8 +69,8 @@ impl OxlintSuppressionFileAction {
 #[derive(Debug)]
 pub struct SuppressionManager {
     pub suppressions_by_file: Option<SuppressionTracking>,
-    pub manager_status: OxlintSuppressionFileAction,
-    suppression_path: PathBuf,
+    pub file_action: OxlintSuppressionFileAction,
+    suppression_file_path: PathBuf,
     suppress_all: bool,
     prune_suppression: bool,
     //If the source of truth exists
@@ -96,9 +96,9 @@ impl SuppressionManager {
 
             return Self {
                 suppressions_by_file,
-                manager_status,
+                file_action: manager_status,
                 file_exists: false,
-                suppression_path: path,
+                suppression_file_path: path,
                 prune_suppression,
                 suppress_all,
             };
@@ -107,16 +107,16 @@ impl SuppressionManager {
         match SuppressionTracking::from_file(&path, cwd) {
             Ok(suppression_file) => Self {
                 suppressions_by_file: Some(suppression_file),
-                manager_status: OxlintSuppressionFileAction::Exists,
-                suppression_path: path,
+                file_action: OxlintSuppressionFileAction::Exists,
+                suppression_file_path: path,
                 file_exists: true,
                 prune_suppression,
                 suppress_all,
             },
             Err(err) => Self {
                 suppressions_by_file: None,
-                manager_status: OxlintSuppressionFileAction::Malformed(err),
-                suppression_path: path,
+                file_action: OxlintSuppressionFileAction::Malformed(err),
+                suppression_file_path: path,
                 file_exists: true,
                 prune_suppression,
                 suppress_all,
@@ -129,7 +129,7 @@ impl SuppressionManager {
         let diff_manager = DiffManager::new(
             self.concurrent_map(),
             self.file_exists,
-            self.manager_status.ignore(),
+            self.file_action.ignore(),
             self.suppress_all,
         );
 
@@ -258,8 +258,8 @@ impl SuppressionManager {
     }
 
     fn has_been_updated(&mut self) {
-        if self.manager_status == OxlintSuppressionFileAction::Exists {
-            self.manager_status = OxlintSuppressionFileAction::Updated;
+        if self.file_action == OxlintSuppressionFileAction::Exists {
+            self.file_action = OxlintSuppressionFileAction::Updated;
         }
     }
 
@@ -286,6 +286,6 @@ impl SuppressionManager {
             ));
         };
 
-        file.save(&self.suppression_path)
+        file.save(&self.suppression_file_path)
     }
 }
