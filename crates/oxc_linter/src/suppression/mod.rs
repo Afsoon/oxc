@@ -233,83 +233,73 @@ impl SuppressionManager {
         result
     }
 
-    /// Read-only mode: generate diagnostic messages for differences.
+    /// Read-only mode: generate at most two summary diagnostics.
+    /// One for unused/stale suppressions (suggest prune), one for new violations (suggest suppress).
     fn compute_diagnostics(
         static_map: &StaticSuppressionMap,
         runtime_map: &FxHashMap<Filename, FileSuppressionsMap>,
     ) -> Vec<OxcDiagnostic> {
-        let mut errors = vec![];
+        let mut has_unused = false;
+        let mut has_new = false;
 
         for (filename, static_rules) in static_map.iter() {
             if let Some(runtime_rules) = runtime_map.get(filename) {
                 for (rule, static_count) in static_rules {
                     if let Some(runtime_count) = runtime_rules.get(rule) {
                         if static_count.count > runtime_count.count {
-                            errors.push(
-                                OxcDiagnostic::error(format!(
-                                    "The number of '{rule}' errors in {filename} decreased from {} to {}.",
-                                    static_count.count, runtime_count.count
-                                ))
-                                .with_help("Update `oxlint-suppressions.json` file running `oxlint --prune-suppressions`"),
-                            );
+                            has_unused = true;
                         } else if static_count.count < runtime_count.count {
-                            errors.push(
-                                OxcDiagnostic::error(format!(
-                                    "The number of '{rule}' errors in {filename} increased from {} to {}.",
-                                    static_count.count, runtime_count.count
-                                ))
-                                .with_help("Update `oxlint-suppressions.json` file running `oxlint --suppress-all`"),
-                            );
+                            has_new = true;
                         }
                     } else {
-                        errors.push(
-                            OxcDiagnostic::error(format!(
-                                "The '{rule}' rule has been pruned from {filename}."
-                            ))
-                            .with_help("Update `oxlint-suppressions.json` file running `oxlint --prune-suppressions`"),
-                        );
+                        has_unused = true;
+                    }
+                    if has_unused && has_new {
+                        break;
                     }
                 }
 
-                for (rule, runtime_count) in runtime_rules {
-                    if !static_rules.contains_key(rule) {
-                        let s = if runtime_count.count == 1 { "" } else { "s" };
-                        errors.push(
-                            OxcDiagnostic::error(format!(
-                                "{} new '{rule}' error{s} appeared in {filename}.",
-                                runtime_count.count
-                            ))
-                            .with_help("Update `oxlint-suppressions.json` file running `oxlint --suppress-all`"),
-                        );
+                if !(has_unused && has_new) {
+                    for rule in runtime_rules.keys() {
+                        if !static_rules.contains_key(rule) {
+                            has_new = true;
+                            break;
+                        }
                     }
                 }
             } else if runtime_map.contains_key(filename) {
-                // File seen but empty runtime — all rules pruned
-                for rule in static_rules.keys() {
-                    errors.push(
-                        OxcDiagnostic::error(format!(
-                            "The '{rule}' rule has been pruned from {filename}."
-                        ))
-                        .with_help("Update `oxlint-suppressions.json` file running `oxlint --prune-suppressions`"),
-                    );
+                has_unused = true;
+            }
+            if has_unused && has_new {
+                break;
+            }
+        }
+
+        if !has_new {
+            for filename in runtime_map.keys() {
+                if !static_map.contains_key(filename) {
+                    has_new = true;
+                    break;
                 }
             }
         }
 
-        // New files in runtime not in static
-        for (filename, runtime_rules) in runtime_map {
-            if !static_map.contains_key(filename) {
-                for (rule, runtime_count) in runtime_rules {
-                    let s = if runtime_count.count == 1 { "" } else { "s" };
-                    errors.push(
-                        OxcDiagnostic::error(format!(
-                            "{} new '{rule}' error{s} appeared in {filename}.",
-                            runtime_count.count
-                        ))
-                        .with_help("Update `oxlint-suppressions.json` file running `oxlint --suppress-all`"),
-                    );
-                }
-            }
+        let mut errors = vec![];
+
+        if has_unused {
+            errors.push(
+                OxcDiagnostic::error("There are suppressions that do not occur anymore.")
+                    .with_help("Run `oxlint --prune-suppressions` to remove unused suppressions."),
+            );
+        }
+
+        if has_new {
+            errors.push(
+                OxcDiagnostic::error(
+                    "There are new violations not covered by the suppressions file.",
+                )
+                .with_help("Run `oxlint --suppress-all` to update the suppressions file."),
+            );
         }
 
         errors
