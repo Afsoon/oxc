@@ -1724,6 +1724,16 @@ mod suppression {
     }
 
     #[test]
+    fn test_prune_removes_deleted_file_entries() {
+        SuppressionTester::new()
+            .with_cwd("prune_deleted_file")
+            .with_setup_file(true)
+            .with_expected_file(true)
+            .with_backup_file(true)
+            .test(&["--prune-suppressions"]);
+    }
+
+    #[test]
     fn test_only_non_fixed_diagnostics_are_reported() {
         SuppressionTester::new()
             .with_cwd("only_non_fixed_diagnostics_are_reported")

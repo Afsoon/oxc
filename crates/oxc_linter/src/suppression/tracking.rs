@@ -63,10 +63,6 @@ impl RuleName {
 
         Self(compose_key)
     }
-
-    pub fn is_typescript_rule(&self) -> bool {
-        self.0.contains("await-thenable")
-    }
 }
 
 impl std::fmt::Display for RuleName {
@@ -143,43 +139,12 @@ impl SuppressionTracking {
         Ok(config)
     }
 
-    pub fn suppressions(&self) -> &AllSuppressionsMap {
-        &self.suppressions
+    pub fn from_map(map: FxHashMap<Filename, FileSuppressionsMap>) -> Self {
+        Self { suppressions: Arc::new(map) }
     }
 
-    pub fn update(&mut self, diff: SuppressionDiff) {
-        let map = Arc::make_mut(&mut self.suppressions);
-
-        match diff {
-            SuppressionDiff::Increased { file, rule, from: _, to }
-            | SuppressionDiff::Decreased { file, rule, from: _, to } => {
-                map.get_mut(&file).unwrap().get_mut(&rule).unwrap().count = to;
-            }
-            SuppressionDiff::PrunedRuled { file, rule } => {
-                let Some(file_map) = map.get_mut(&file) else {
-                    return;
-                };
-
-                let Some(_) = file_map.get(&rule) else {
-                    return;
-                };
-
-                if file_map.len() == 1 {
-                    map.remove(&file);
-                } else {
-                    file_map.remove(&rule);
-                }
-            }
-            SuppressionDiff::Appeared { file, rule, count } => {
-                if let Some(file) = map.get_mut(&file) {
-                    file.insert(rule, DiagnosticCounts { count });
-                } else {
-                    let mut file_diagnostic: FileSuppressionsMap = FxHashMap::default();
-                    file_diagnostic.insert(rule, DiagnosticCounts { count });
-                    map.insert(file, file_diagnostic);
-                }
-            }
-        }
+    pub fn suppressions(&self) -> &AllSuppressionsMap {
+        &self.suppressions
     }
 
     pub fn save(&self, path: &Path) -> Result<(), OxcDiagnostic> {
@@ -192,47 +157,6 @@ impl SuppressionTracking {
         })?;
 
         Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum SuppressionDiff {
-    Increased { file: Filename, rule: RuleName, from: usize, to: usize },
-    Decreased { file: Filename, rule: RuleName, from: usize, to: usize },
-    PrunedRuled { file: Filename, rule: RuleName },
-    Appeared { file: Filename, rule: RuleName, count: usize },
-}
-
-impl From<SuppressionDiff> for OxcDiagnostic {
-    fn from(val: SuppressionDiff) -> Self {
-        let help = match &val {
-            SuppressionDiff::Increased { file: _, rule: _, from: _, to: _ }
-            | SuppressionDiff::Appeared { file: _, rule: _, count: _ } => {
-                "Update `oxlint-suppressions.json` file running `oxlint --suppress--all`"
-            }
-            SuppressionDiff::Decreased { file: _, rule: _, from: _, to: _ }
-            | SuppressionDiff::PrunedRuled { file: _, rule: _ } => {
-                "Update `oxlint-suppressions.json` file running `oxlint --prune-suppressions`"
-            }
-        };
-
-        let message = match val {
-            SuppressionDiff::Increased { file, rule, from, to } => {
-                format!("The number of '{rule}' errors in {file} increased from {from} to {to}.")
-            }
-            SuppressionDiff::Decreased { file, rule, from, to } => {
-                format!("The number of '{rule}' errors in {file} decreased from {from} to {to}.")
-            }
-            SuppressionDiff::PrunedRuled { file, rule } => {
-                format!("The '{rule}' rule has been pruned from {file}.")
-            }
-            SuppressionDiff::Appeared { file, rule, count } => {
-                let s = if count == 1 { "" } else { "s" };
-                format!("{count} new '{rule}' error{s} appeared in {file}.")
-            }
-        };
-
-        OxcDiagnostic::error(message).with_help(help)
     }
 }
 

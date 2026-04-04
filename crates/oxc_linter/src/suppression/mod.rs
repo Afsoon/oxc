@@ -10,7 +10,7 @@ mod diff;
 mod tracking;
 
 pub use tracking::{
-    DiagnosticCounts, Filename, RuleName, SuppressionDiff, SuppressionFile, SuppressionFileState,
+    DiagnosticCounts, Filename, RuleName, SuppressionFile, SuppressionFileState,
     SuppressionTracking,
 };
 
@@ -137,8 +137,8 @@ impl SuppressionManager {
         Arc::new(diff_manager)
     }
 
-    /// Finalize: compute diff between static suppression file and merged runtime map,
-    /// then either report errors or update the suppression file.
+    /// Finalize: compute new suppression state from static file + merged runtime map,
+    /// then either update the suppression file or report diagnostics.
     ///
     /// # Panics
     /// Panics if `DiffManager` has any outstanding references to it still.
@@ -153,109 +153,166 @@ impl SuppressionManager {
         let runtime_map = diff_manager.into_runtime_map().into_inner();
 
         let static_map = self.concurrent_map();
-        let diffs = Self::compute_diff(&static_map, &runtime_map);
-
-        if diffs.is_empty() {
-            return Ok(());
-        }
 
         if self.is_updating_file() {
-            for diff in diffs {
-                match &diff {
-                    // Only add new/increased entries when suppress_all is set
-                    SuppressionDiff::Appeared { .. } | SuppressionDiff::Increased { .. } => {
-                        if !self.suppress_all {
-                            continue;
-                        }
-                    }
-                    // Prune/decrease always applies
-                    SuppressionDiff::PrunedRuled { .. } | SuppressionDiff::Decreased { .. } => {}
-                }
-                self.update(diff);
-            }
+            let new_map = if self.suppress_all {
+                Self::compute_suppress(&static_map, &runtime_map)
+            } else {
+                Self::compute_prune(&static_map, &runtime_map, cwd)
+            };
+            self.suppressions_by_file = Some(SuppressionTracking::from_map(new_map));
             self.has_been_updated();
             self.write()
         } else {
-            // Report diffs as diagnostics
-            let errors: Vec<OxcDiagnostic> = diffs.into_iter().map(Into::into).collect();
-            let diagnostics = DiagnosticService::wrap_diagnostics(cwd, Path::new(""), "", errors);
-            tx_error.send(diagnostics).unwrap();
+            // Read-only mode: report diagnostics for any differences
+            let errors = Self::compute_diagnostics(&static_map, &runtime_map);
+            if !errors.is_empty() {
+                let diagnostics =
+                    DiagnosticService::wrap_diagnostics(cwd, Path::new(""), "", errors);
+                tx_error.send(diagnostics).unwrap();
+            }
             Ok(())
         }
     }
 
-    fn compute_diff(
+    /// Suppress mode: overwrite counts with runtime values for seen files.
+    /// Unseen files keep their static values.
+    fn compute_suppress(
         static_map: &StaticSuppressionMap,
         runtime_map: &FxHashMap<Filename, FileSuppressionsMap>,
-    ) -> Vec<SuppressionDiff> {
-        let mut diffs = vec![];
+    ) -> FxHashMap<Filename, FileSuppressionsMap> {
+        let mut result: FxHashMap<Filename, FileSuppressionsMap> = static_map.as_ref().clone();
 
-        // Check all files in the static map
+        for (filename, runtime_rules) in runtime_map {
+            // For seen files, merge: keep static rules not in runtime, overwrite with runtime counts
+            let entry = result.entry(filename.clone()).or_default();
+            // Overwrite all runtime rule counts
+            for (rule, runtime_count) in runtime_rules {
+                entry.insert(rule.clone(), runtime_count.clone());
+            }
+        }
+
+        result
+    }
+
+    /// Prune mode: for seen files, remove rules absent in runtime and decrease counts.
+    /// Also remove entries for files that no longer exist on disk.
+    fn compute_prune(
+        static_map: &StaticSuppressionMap,
+        runtime_map: &FxHashMap<Filename, FileSuppressionsMap>,
+        cwd: &Path,
+    ) -> FxHashMap<Filename, FileSuppressionsMap> {
+        let mut result: FxHashMap<Filename, FileSuppressionsMap> = FxHashMap::default();
+
         for (filename, static_rules) in static_map.iter() {
             if let Some(runtime_rules) = runtime_map.get(filename) {
-                // File exists in both — compare rules
+                // File was linted — only keep rules that still fire, with min count
+                let mut file_rules = FileSuppressionsMap::default();
+                for (rule, static_count) in static_rules {
+                    if let Some(runtime_count) = runtime_rules.get(rule) {
+                        let count = static_count.count.min(runtime_count.count);
+                        if count > 0 {
+                            file_rules.insert(rule.clone(), DiagnosticCounts { count });
+                        }
+                    }
+                    // Rule not in runtime = pruned, don't include
+                }
+                if !file_rules.is_empty() {
+                    result.insert(filename.clone(), file_rules);
+                }
+            } else {
+                // File not linted this run — check if it still exists on disk
+                let file_path = cwd.join(filename.to_string());
+                if file_path.exists() {
+                    result.insert(filename.clone(), static_rules.clone());
+                }
+                // File doesn't exist on disk — drop it (deleted file cleanup)
+            }
+        }
+
+        result
+    }
+
+    /// Read-only mode: generate diagnostic messages for differences.
+    fn compute_diagnostics(
+        static_map: &StaticSuppressionMap,
+        runtime_map: &FxHashMap<Filename, FileSuppressionsMap>,
+    ) -> Vec<OxcDiagnostic> {
+        let mut errors = vec![];
+
+        for (filename, static_rules) in static_map.iter() {
+            if let Some(runtime_rules) = runtime_map.get(filename) {
                 for (rule, static_count) in static_rules {
                     if let Some(runtime_count) = runtime_rules.get(rule) {
                         if static_count.count > runtime_count.count {
-                            diffs.push(SuppressionDiff::Decreased {
-                                file: filename.clone(),
-                                rule: rule.clone(),
-                                from: static_count.count,
-                                to: runtime_count.count,
-                            });
+                            errors.push(
+                                OxcDiagnostic::error(format!(
+                                    "The number of '{rule}' errors in {filename} decreased from {} to {}.",
+                                    static_count.count, runtime_count.count
+                                ))
+                                .with_help("Update `oxlint-suppressions.json` file running `oxlint --prune-suppressions`"),
+                            );
                         } else if static_count.count < runtime_count.count {
-                            diffs.push(SuppressionDiff::Increased {
-                                file: filename.clone(),
-                                rule: rule.clone(),
-                                from: static_count.count,
-                                to: runtime_count.count,
-                            });
+                            errors.push(
+                                OxcDiagnostic::error(format!(
+                                    "The number of '{rule}' errors in {filename} increased from {} to {}.",
+                                    static_count.count, runtime_count.count
+                                ))
+                                .with_help("Update `oxlint-suppressions.json` file running `oxlint --suppress-all`"),
+                            );
                         }
                     } else {
-                        // Rule in static but not in runtime — pruned
-                        diffs.push(SuppressionDiff::PrunedRuled {
-                            file: filename.clone(),
-                            rule: rule.clone(),
-                        });
+                        errors.push(
+                            OxcDiagnostic::error(format!(
+                                "The '{rule}' rule has been pruned from {filename}."
+                            ))
+                            .with_help("Update `oxlint-suppressions.json` file running `oxlint --prune-suppressions`"),
+                        );
                     }
                 }
 
-                // New rules in runtime not in static
                 for (rule, runtime_count) in runtime_rules {
                     if !static_rules.contains_key(rule) {
-                        diffs.push(SuppressionDiff::Appeared {
-                            file: filename.clone(),
-                            rule: rule.clone(),
-                            count: runtime_count.count,
-                        });
+                        let s = if runtime_count.count == 1 { "" } else { "s" };
+                        errors.push(
+                            OxcDiagnostic::error(format!(
+                                "{} new '{rule}' error{s} appeared in {filename}.",
+                                runtime_count.count
+                            ))
+                            .with_help("Update `oxlint-suppressions.json` file running `oxlint --suppress-all`"),
+                        );
                     }
                 }
             } else if runtime_map.contains_key(filename) {
                 // File seen but empty runtime — all rules pruned
                 for rule in static_rules.keys() {
-                    diffs.push(SuppressionDiff::PrunedRuled {
-                        file: filename.clone(),
-                        rule: rule.clone(),
-                    });
+                    errors.push(
+                        OxcDiagnostic::error(format!(
+                            "The '{rule}' rule has been pruned from {filename}."
+                        ))
+                        .with_help("Update `oxlint-suppressions.json` file running `oxlint --prune-suppressions`"),
+                    );
                 }
             }
-            // If the file is not in runtime_map at all, it wasn't linted this run — skip
         }
 
-        // Files in runtime but not in static — all rules are new
+        // New files in runtime not in static
         for (filename, runtime_rules) in runtime_map {
             if !static_map.contains_key(filename) {
                 for (rule, runtime_count) in runtime_rules {
-                    diffs.push(SuppressionDiff::Appeared {
-                        file: filename.clone(),
-                        rule: rule.clone(),
-                        count: runtime_count.count,
-                    });
+                    let s = if runtime_count.count == 1 { "" } else { "s" };
+                    errors.push(
+                        OxcDiagnostic::error(format!(
+                            "{} new '{rule}' error{s} appeared in {filename}.",
+                            runtime_count.count
+                        ))
+                        .with_help("Update `oxlint-suppressions.json` file running `oxlint --suppress-all`"),
+                    );
                 }
             }
         }
 
-        diffs
+        errors
     }
 
     fn has_been_updated(&mut self) {
@@ -270,14 +327,6 @@ impl SuppressionManager {
 
     fn is_updating_file(&self) -> bool {
         self.suppress_all || self.prune_suppression
-    }
-
-    fn update(&mut self, diff: SuppressionDiff) {
-        let Some(file) = self.suppressions_by_file.as_mut() else {
-            return;
-        };
-
-        file.update(diff);
     }
 
     fn write(&self) -> Result<(), OxcDiagnostic> {
