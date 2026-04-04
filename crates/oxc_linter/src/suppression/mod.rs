@@ -82,14 +82,17 @@ impl SuppressionManager {
         let path = cwd.join(file_path);
 
         if !path.exists() {
-            let manager_status = if suppress_all {
+            let manager_status = if suppress_all || prune_suppression {
                 OxlintSuppressionFileAction::Created
             } else {
                 OxlintSuppressionFileAction::None
             };
 
-            let suppressions_by_file =
-                if suppress_all { Some(SuppressionTracking::default()) } else { None };
+            let suppressions_by_file = if suppress_all || prune_suppression {
+                Some(SuppressionTracking::default())
+            } else {
+                None
+            };
 
             return Self {
                 suppressions_by_file,
@@ -157,6 +160,16 @@ impl SuppressionManager {
 
         if self.is_updating_file() {
             for diff in diffs {
+                match &diff {
+                    // Only add new/increased entries when suppress_all is set
+                    SuppressionDiff::Appeared { .. } | SuppressionDiff::Increased { .. } => {
+                        if !self.suppress_all {
+                            continue;
+                        }
+                    }
+                    // Prune/decrease always applies
+                    SuppressionDiff::PrunedRuled { .. } | SuppressionDiff::Decreased { .. } => {}
+                }
                 self.update(diff);
             }
             self.has_been_updated();
@@ -267,12 +280,6 @@ impl SuppressionManager {
     }
 
     fn write(&self) -> Result<(), OxcDiagnostic> {
-        if !self.file_exists && (self.prune_suppression && !self.suppress_all) {
-            return Err(OxcDiagnostic::error(
-                "You can't prune error messages if a bulk suppression file doesn't exist.",
-            ));
-        }
-
         let Some(file) = self.suppressions_by_file.as_ref() else {
             return Err(OxcDiagnostic::error(
                 "You can't prune error messages if a bulk suppression file is malformed.",
