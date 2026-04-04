@@ -3,13 +3,13 @@
     "eslint/no-console": {
       "count": 3
     },
-    "typescript-eslint/await-thenable": {
+    "eslint/no-unused-vars": {
       "count": 1
     },
     "typescript-eslint/array-type": {
       "count": 1
     },
-    "eslint/no-unused-vars": {
+    "typescript-eslint/await-thenable": {
       "count": 1
     }
   }

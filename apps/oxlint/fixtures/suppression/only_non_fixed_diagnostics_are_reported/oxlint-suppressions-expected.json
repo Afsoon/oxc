@@ -1,13 +1,13 @@
 {
   "files/test.ts": {
-    "typescript-eslint/await-thenable": {
-      "count": 1
-    },
     "eslint/no-console": {
       "count": 1
     },
     "eslint/no-unused-vars": {
       "count": 4
+    },
+    "typescript-eslint/await-thenable": {
+      "count": 1
     }
   }
 }

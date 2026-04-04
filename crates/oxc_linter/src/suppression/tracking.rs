@@ -13,7 +13,7 @@ pub struct DiagnosticCounts {
     pub count: usize,
 }
 
-#[derive(Debug, Default, Clone, Deserialize, Serialize, Hash, Eq, PartialEq)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize, Hash, Eq, PartialEq, Ord, PartialOrd)]
 #[serde(default)]
 pub struct Filename(String);
 
@@ -29,7 +29,7 @@ impl std::fmt::Display for Filename {
     }
 }
 
-#[derive(Debug, Default, Clone, Deserialize, Serialize, Hash, Eq, PartialEq)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize, Hash, Eq, PartialEq, Ord, PartialOrd)]
 #[serde(default)]
 pub struct RuleName(String);
 
@@ -78,7 +78,12 @@ fn serialize_arc_map<S>(map: &AllSuppressionsMap, serializer: S) -> Result<S::Ok
 where
     S: serde::Serializer,
 {
-    map.as_ref().serialize(serializer)
+    use std::collections::BTreeMap;
+    let sorted: BTreeMap<&Filename, BTreeMap<&RuleName, &DiagnosticCounts>> = map
+        .iter()
+        .map(|(filename, rules)| (filename, rules.iter().collect::<BTreeMap<_, _>>()))
+        .collect();
+    sorted.serialize(serializer)
 }
 
 fn deserialize_arc_map<'de, D>(deserializer: D) -> Result<AllSuppressionsMap, D::Error>

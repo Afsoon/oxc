@@ -1,7 +1,7 @@
 {
-  "folder_a/test.js": {
+  "folder_a/test.ts": {
     "eslint/no-console": {
-      "count": 3
+      "count": 1
     }
   }
 }

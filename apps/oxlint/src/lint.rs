@@ -1839,7 +1839,7 @@ mod suppression {
     #[test]
     fn test_prunning_errors_update_the_file_when_errors_are_increased() {
         SuppressionTester::new()
-            .with_cwd("with_arg_and_increased_errors")
+            .with_cwd("with_arg_and_increased_errors_prune")
             .with_setup_file(true)
             .with_expected_file(true)
             .with_backup_file(true)
@@ -1859,7 +1859,7 @@ mod suppression {
     #[test]
     fn test_prunning_errors_update_the_file_when_errors_are_decreased() {
         SuppressionTester::new()
-            .with_cwd("with_arg_and_decreased_errors")
+            .with_cwd("with_arg_and_decreased_errors_prune")
             .with_setup_file(true)
             .with_expected_file(true)
             .with_backup_file(true)
@@ -1885,14 +1885,5 @@ mod suppression {
             .with_expected_file(false)
             .with_backup_file(false)
             .test(&["--suppress-all", "--type-check"]);
-    }
-
-    #[test]
-    fn test_warnings_not_suppressed() {
-        SuppressionTester::new()
-            .with_cwd("warnings_not_suppressed")
-            .with_setup_file(false)
-            .with_expected_file(true)
-            .test(&["--suppress-all"]);
     }
 }

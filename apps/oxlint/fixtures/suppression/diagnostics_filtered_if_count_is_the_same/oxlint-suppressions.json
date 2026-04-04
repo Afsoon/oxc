@@ -8,14 +8,14 @@
     "eslint/no-console": {
       "count": 1
     },
-    "typescript-eslint/await-thenable": {
-      "count": 1
+    "eslint/no-unused-vars": {
+      "count": 3
     },
     "typescript-eslint/array-type": {
       "count": 1
     },
-    "eslint/no-unused-vars": {
-      "count": 3
+    "typescript-eslint/await-thenable": {
+      "count": 1
     }
   }
 }

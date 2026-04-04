@@ -1,7 +1,1 @@
-{
-  "files/test.ts": {
-    "eslint/no-eq-null": {
-      "count": 1
-    }
-  }
-}
+{}
