@@ -1,10 +1,7 @@
 {
-  "version": "0.1.0",
-  "suppressions": {
-    "folder_a/test.js": {
-      "eslint/no-console": {
-        "count": 3
-      }
+  "folder_a/test.js": {
+    "eslint/no-console": {
+      "count": 3
     }
   }
 }

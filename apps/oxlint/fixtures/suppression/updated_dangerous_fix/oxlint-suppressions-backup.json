@@ -1,19 +1,16 @@
 {
-  "version": "0.1.0",
-  "suppressions": {
-    "files/test.ts": {
-      "eslint/no-eq-null": {
-        "count": 1
-      },
-      "typescript-eslint/await-thenable": {
-        "count": 1
-      },
-      "eslint/no-debugger": {
-        "count": 1
-      },
-      "typescript-eslint/array-type": {
-        "count": 3
-      }
+  "files/test.ts": {
+    "eslint/no-eq-null": {
+      "count": 1
+    },
+    "typescript-eslint/await-thenable": {
+      "count": 1
+    },
+    "eslint/no-debugger": {
+      "count": 1
+    },
+    "typescript-eslint/array-type": {
+      "count": 3
     }
   }
 }

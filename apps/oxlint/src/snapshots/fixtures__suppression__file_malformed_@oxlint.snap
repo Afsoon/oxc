@@ -33,7 +33,7 @@ working directory: fixtures/suppression/file_malformed
 
 Found 0 warnings and 3 errors.
 Failed to parse oxlint config oxlint-suppressions.json.
-trailing comma at line 7 column 7
+trailing comma at line 5 column 5
 Finished in <variable>ms on 1 file with 56 rules using 1 threads.
 ----------
 CLI result: LintFoundErrors

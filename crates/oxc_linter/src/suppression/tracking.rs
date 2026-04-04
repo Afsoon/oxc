@@ -93,16 +93,15 @@ where
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(default)]
+#[serde(transparent)]
 pub struct SuppressionTracking {
-    version: String,
     #[serde(deserialize_with = "deserialize_arc_map", serialize_with = "serialize_arc_map")]
     suppressions: AllSuppressionsMap,
 }
 
 impl Default for SuppressionTracking {
     fn default() -> Self {
-        Self { version: "0.1.0".to_string(), suppressions: Arc::new(FxHashMap::default()) }
+        Self { suppressions: Arc::new(FxHashMap::default()) }
     }
 }
 
