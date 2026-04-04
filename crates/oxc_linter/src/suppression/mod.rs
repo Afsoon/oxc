@@ -83,17 +83,14 @@ impl SuppressionManager {
         let file_exists = suppression_file_path.exists();
 
         if !file_exists {
-            let file_action = if suppress_all || prune_suppression {
+            let file_action = if suppress_all {
                 OxlintSuppressionFileAction::Created
             } else {
                 OxlintSuppressionFileAction::None
             };
 
-            let suppressions_by_file = if suppress_all || prune_suppression {
-                Some(SuppressionTracking::default())
-            } else {
-                None
-            };
+            let suppressions_by_file =
+                if suppress_all { Some(SuppressionTracking::default()) } else { None };
 
             return Self {
                 suppressions_by_file,
@@ -148,6 +145,11 @@ impl SuppressionManager {
         tx_error: &DiagnosticSender,
         cwd: &Path,
     ) -> Result<(), OxcDiagnostic> {
+        // Nothing to do if there's no suppression file and we're not creating one
+        if self.suppressions_by_file.is_none() && !self.suppress_all {
+            return Ok(());
+        }
+
         let diff_manager = Arc::into_inner(diff_manager)
             .expect("DiffManager still has outstanding Arc references");
         let runtime_map = diff_manager.into_runtime_map().into_inner();

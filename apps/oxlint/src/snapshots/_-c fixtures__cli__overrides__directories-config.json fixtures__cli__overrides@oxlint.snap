@@ -6,9 +6,6 @@ arguments: -c fixtures/cli/overrides/directories-config.json fixtures/cli/overri
 working directory: 
 ----------
 
-  x There are new violations not covered by the suppressions file.
-  help: Run `oxlint --suppress-all` to update the suppressions file.
-
   x eslint(no-debugger): `debugger` statement is not allowed
    ,-[fixtures/cli/overrides/lib/index.ts:1:1]
  1 | debugger;
@@ -37,7 +34,7 @@ working directory:
    `----
   help: Remove the debugger statement
 
-Found 2 warnings and 3 errors.
+Found 2 warnings and 2 errors.
 Finished in <variable>ms on 7 files with 92 rules using 1 threads.
 ----------
 CLI result: LintFoundErrors

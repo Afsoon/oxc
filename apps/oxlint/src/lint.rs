@@ -1711,15 +1711,12 @@ mod suppression {
     }
 
     #[test]
-    fn test_pruning_creates_empty_file() {
-        // This ensures parity with ESLint, although it's not a strict requirement.
-        // ESLint will not produce any error message if you pass `--prune-suppressions`
-        // without `--suppress-all`. It just creates an empty suppression file, which
-        // is acceptable behavior unless we want to be really strict about it.
+    fn test_pruning_without_file_does_not_create_one() {
+        // This diverges from ESLint now, but probably not a big deal either way
         SuppressionTester::new()
             .with_cwd("pruning_cannot_create_a_file")
             .with_setup_file(false)
-            .with_expected_file(true)
+            .with_expected_file(false)
             .test(&["--prune-suppressions", "--type-aware", "--type-check"]);
     }
 
