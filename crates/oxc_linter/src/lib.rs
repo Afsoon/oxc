@@ -151,18 +151,6 @@ impl Linter {
         self
     }
 
-    #[must_use]
-    pub fn with_suppress_all(mut self, suppress_all: bool) -> Self {
-        self.options.suppress_all = suppress_all;
-        self
-    }
-
-    #[must_use]
-    pub fn with_prune_suppressions(mut self, prune_suppressions: bool) -> Self {
-        self.options.prune_suppressions = prune_suppressions;
-        self
-    }
-
     pub(crate) fn options(&self) -> &LintOptions {
         &self.options
     }

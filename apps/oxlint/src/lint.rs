@@ -403,9 +403,7 @@ impl CliRunner {
 
         let linter = Linter::new(LintOptions::default(), config_store, external_linter)
             .with_fix(fix_options.fix_kind())
-            .with_report_unused_directives(report_unused_directives)
-            .with_suppress_all(suppression_options.suppress_all)
-            .with_prune_suppressions(suppression_options.prune_suppressions);
+            .with_report_unused_directives(report_unused_directives);
 
         let number_of_files = files_to_lint.len();
         let tsconfig = basic_options.tsconfig;
