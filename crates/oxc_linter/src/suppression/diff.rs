@@ -13,7 +13,7 @@ use crate::{
 pub struct DiffManager {
     tracking_map: StaticSuppressionMap,
     runtime_map: RuntimeSuppressionMap,
-    has_suppress_all_arg: bool,
+    suppress_all: bool,
     file_exists: bool,
     ignore_diff: bool,
 }
@@ -23,12 +23,12 @@ impl DiffManager {
         tracking_map: StaticSuppressionMap,
         file_exists: bool,
         ignore_diff: bool,
-        has_suppress_all_arg: bool,
+        suppress_all: bool,
     ) -> Self {
         Self {
             tracking_map,
             runtime_map: RuntimeSuppressionMap::default(),
-            has_suppress_all_arg,
+            suppress_all,
             file_exists,
             ignore_diff,
         }
@@ -53,7 +53,7 @@ impl DiffManager {
         let filename = Filename::new(file_path);
         let suppression_data = self.tracking_map.get(&filename);
         let suppression_file =
-            SuppressionFile::new(self.file_exists, self.has_suppress_all_arg, suppression_data);
+            SuppressionFile::new(self.file_exists, self.suppress_all, suppression_data);
 
         let (filtered_diagnostics, runtime_counts) =
             Self::suppress_lint_diagnostics(&suppression_file, messages);
