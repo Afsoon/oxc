@@ -4,9 +4,21 @@
 # stdout
 ```
 Found 0 warnings and 0 errors.
+'oxlint-suppressions.json' has been updated.
 Finished in Xms on 1 file with 92 rules using X threads.
 ```
 
 # stderr
 ```
+```
+
+# File altered: oxlint-suppressions.json
+```
+{
+  "files/test.js": {
+    "best-plugin-ever/no-debug": {
+      "count": 1
+    }
+  }
+}
 ```
