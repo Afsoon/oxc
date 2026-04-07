@@ -13,6 +13,13 @@ pub struct MessageRule {
     pub rule_name: Cow<'static, str>,
 }
 
+impl MessageRule {
+    /// Returns the canonical name of the rule in the format `{plugin}/{rule}`.
+    pub fn canonical_name(&self) -> String {
+        format!("{}/{}", self.plugin_name, self.rule_name)
+    }
+}
+
 use crate::LintContext;
 
 mod fix;

@@ -5,8 +5,8 @@ use rustc_hash::FxHashMap;
 use crate::{
     Message,
     suppression::{
-        DiagnosticCounts, Filename, RuleName, RuntimeSuppressionMap, StaticSuppressionMap,
-        SuppressionFile, SuppressionFileState,
+        DiagnosticCounts, Filename, RuntimeSuppressionMap, StaticSuppressionMap, SuppressionFile,
+        SuppressionFileState,
     },
 };
 
@@ -92,12 +92,14 @@ impl DiffManager {
     fn suppress_lint_diagnostics(
         suppression_file_state: &SuppressionFile<'_>,
         lint_diagnostics: Vec<Message>,
-    ) -> (Vec<Message>, Option<FxHashMap<RuleName, DiagnosticCounts>>) {
+    ) -> (Vec<Message>, Option<FxHashMap<String, DiagnosticCounts>>) {
         let build_suppression_map = |diagnostics: &Vec<Message>| {
-            let mut suppression_tracking: FxHashMap<RuleName, DiagnosticCounts> =
+            let mut suppression_tracking: FxHashMap<String, DiagnosticCounts> =
                 FxHashMap::default();
             for message in diagnostics {
-                let Ok(key) = RuleName::try_from(message) else {
+                let Some(key) =
+                    message.rule.as_ref().map(super::super::fixer::MessageRule::canonical_name)
+                else {
                     continue;
                 };
 
@@ -124,7 +126,11 @@ impl DiffManager {
                 let diagnostics_filtered = lint_diagnostics
                     .into_iter()
                     .filter(|message| {
-                        let Ok(key) = RuleName::try_from(message) else {
+                        let Some(key) = message
+                            .rule
+                            .as_ref()
+                            .map(super::super::fixer::MessageRule::canonical_name)
+                        else {
                             return true;
                         };
 

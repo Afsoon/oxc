@@ -10,15 +10,14 @@ mod diff;
 mod tracking;
 
 pub use tracking::{
-    DiagnosticCounts, Filename, RuleName, SuppressionFile, SuppressionFileState,
-    SuppressionTracking,
+    DiagnosticCounts, Filename, SuppressionFile, SuppressionFileState, SuppressionTracking,
 };
 
 pub use diff::DiffManager;
 
-type StaticSuppressionMap = Arc<FxHashMap<Filename, FxHashMap<RuleName, DiagnosticCounts>>>;
+type StaticSuppressionMap = Arc<FxHashMap<Filename, FxHashMap<String, DiagnosticCounts>>>;
 
-type FileSuppressionsMap = FxHashMap<RuleName, DiagnosticCounts>;
+type FileSuppressionsMap = FxHashMap<String, DiagnosticCounts>;
 
 /// Thread-safe accumulator for runtime suppression counts from both oxlint and tsgo passes.
 #[derive(Debug, Default)]
@@ -28,7 +27,7 @@ pub struct RuntimeSuppressionMap {
 
 impl RuntimeSuppressionMap {
     /// Merge runtime counts for a file. Counts are additive across passes.
-    pub fn merge_file(&self, filename: Filename, counts: FxHashMap<RuleName, DiagnosticCounts>) {
+    pub fn merge_file(&self, filename: Filename, counts: FxHashMap<String, DiagnosticCounts>) {
         let mut map = self.inner.lock().unwrap();
         let entry = map.entry(filename).or_default();
         for (rule, diagnostic) in counts {

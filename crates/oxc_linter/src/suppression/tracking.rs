@@ -5,7 +5,7 @@ use oxc_diagnostics::OxcDiagnostic;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::{Message, read_to_string};
+use crate::read_to_string;
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 #[serde(default)]
@@ -29,36 +29,7 @@ impl std::fmt::Display for Filename {
     }
 }
 
-#[derive(Debug, Default, Clone, Deserialize, Serialize, Hash, Eq, PartialEq, Ord, PartialOrd)]
-#[serde(default)]
-pub struct RuleName(String);
-
-impl TryFrom<&Message> for RuleName {
-    type Error = String;
-
-    fn try_from(value: &Message) -> Result<Self, Self::Error> {
-        match &value.rule {
-            Some(rule) => Ok(RuleName::new(&rule.plugin_name, &rule.rule_name)),
-            None => Err("Message has no associated rule".to_string()),
-        }
-    }
-}
-
-impl RuleName {
-    pub fn new(plugin_name: &str, rule_name: &str) -> Self {
-        let compose_key = format!("{plugin_name}/{rule_name}");
-
-        Self(compose_key)
-    }
-}
-
-impl std::fmt::Display for RuleName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-type FileSuppressionsMap = FxHashMap<RuleName, DiagnosticCounts>;
+type FileSuppressionsMap = FxHashMap<String, DiagnosticCounts>;
 type AllSuppressionsMap = Arc<FxHashMap<Filename, FileSuppressionsMap>>;
 
 fn serialize_arc_map<S>(map: &AllSuppressionsMap, serializer: S) -> Result<S::Ok, S::Error>
@@ -66,7 +37,7 @@ where
     S: serde::Serializer,
 {
     use std::collections::BTreeMap;
-    let sorted: BTreeMap<&Filename, BTreeMap<&RuleName, &DiagnosticCounts>> = map
+    let sorted: BTreeMap<&Filename, BTreeMap<&String, &DiagnosticCounts>> = map
         .iter()
         .map(|(filename, rules)| (filename, rules.iter().collect::<BTreeMap<_, _>>()))
         .collect();
