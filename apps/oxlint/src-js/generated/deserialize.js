@@ -3,61 +3,59 @@
 
 import { tokens, initTokens } from "../plugins/tokens.js";
 import { comments, initComments } from "../plugins/comments.js";
+import { getNodeLoc } from "../plugins/location.js";
 
 let uint8,
   uint32,
   float64,
   sourceText,
-  sourceIsAscii,
-  sourceStartPos,
-  firstNonAsciiPos,
-  parent = null,
-  getLoc;
+  sourceTextLatin,
+  sourceStartPos = 0,
+  firstNonAsciiPos = 0,
+  parent = null;
 
-const textDecoder = new TextDecoder("utf-8", { ignoreBOM: true }),
-  decodeStr = textDecoder.decode.bind(textDecoder),
-  { fromCodePoint } = String,
-  NodeProto = Object.create(Object.prototype, {
-    loc: {
-      get() {
-        return getLoc(this);
-      },
-      enumerable: true,
+const { fromCharCode } = String,
+  { utf8Slice, latin1Slice } = Buffer.prototype,
+  stringDecodeArrays = Array(65).fill(null);
+for (let i = 0; i <= 64; i++) stringDecodeArrays[i] = Array(i).fill(0);
+
+const NodeProto = Object.create(Object.prototype, {
+  loc: {
+    get() {
+      return getNodeLoc(this);
     },
-  });
+    enumerable: true,
+  },
+});
 
-export function deserializeProgramOnly(
-  buffer,
-  sourceText,
-  sourceStartPosInput,
-  sourceByteLen,
-  getLoc,
-) {
+export function deserializeProgramOnly(buffer, sourceText, sourceStartPosInput, sourceByteLen) {
   sourceStartPos = sourceStartPosInput;
-  return deserializeWith(buffer, sourceText, sourceByteLen, getLoc, deserializeProgram);
+  return deserializeWith(buffer, sourceText, sourceByteLen, deserializeProgram);
 }
 
-function deserializeWith(buffer, sourceTextInput, sourceByteLen, getLocInput, deserialize) {
+function deserializeWith(buffer, sourceTextInput, sourceByteLen, deserialize) {
   uint8 = buffer;
   uint32 = buffer.uint32;
   float64 = buffer.float64;
   sourceText = sourceTextInput;
-  sourceIsAscii = sourceText.length === sourceByteLen;
-  if (!sourceIsAscii) {
-    firstNonAsciiPos = sourceByteLen;
-    for (let i = sourceStartPos, e = sourceStartPos + sourceByteLen; i < e; i++)
-      if (uint8[i] >= 128) {
-        firstNonAsciiPos = i - sourceStartPos;
-        break;
-      }
+  if (sourceText.length === sourceByteLen) {
+    firstNonAsciiPos = sourceStartPos + sourceByteLen;
+    sourceTextLatin = sourceText;
+  } else {
+    let i = sourceStartPos,
+      sourceEndPos = sourceStartPos + sourceByteLen;
+    for (; i < sourceEndPos && uint8[i] < 128; i++);
+    firstNonAsciiPos = i;
+    sourceTextLatin = latin1Slice.call(uint8, sourceStartPos, sourceEndPos);
   }
-  getLoc = getLocInput;
-  return deserialize(uint32[536870900]);
+  let data = deserialize(uint32[536870900]);
+  resetBuffer();
+  return data;
 }
 
 export function resetBuffer() {
-  // Clear buffer and source text string to allow them to be garbage collected
-  uint8 = uint32 = float64 = sourceText = void 0;
+  // Clear buffer and source text strings to allow them to be garbage collected
+  uint8 = uint32 = float64 = sourceText = sourceTextLatin = void 0;
 }
 
 function deserializeProgram(pos) {
@@ -5883,24 +5881,30 @@ function deserializeStr(pos) {
     len = uint32[pos32 + 2];
   if (len === 0) return "";
   pos = uint32[pos32];
-  if (pos >= sourceStartPos && (sourceIsAscii || pos - sourceStartPos + len <= firstNonAsciiPos))
-    return sourceText.substr(pos - sourceStartPos, len);
-  // Use `TextDecoder` for strings longer than 9 bytes.
-  // For shorter strings, the byte-by-byte loop below avoids native call overhead.
-  let end = pos + len;
-  if (len > 9) return decodeStr(uint8.subarray(pos, end));
-  // Shorter strings decode by hand to avoid native call
-  let out = "",
-    c;
-  do {
-    c = uint8[pos++];
-    if (c < 128) out += fromCodePoint(c);
-    else {
-      out += decodeStr(uint8.subarray(pos - 1, end));
-      break;
-    }
-  } while (pos < end);
-  return out;
+  let end = pos + len,
+    isInSourceRegion = pos >= sourceStartPos;
+  if (isInSourceRegion && end <= firstNonAsciiPos)
+    return sourceTextLatin.substr(pos - sourceStartPos, len);
+  // Use `utf8Slice` for strings longer than 64 bytes
+  if (len > 64) return utf8Slice.call(uint8, pos, end);
+  // If string is in source region, use slice of `sourceTextLatin` if all ASCII
+  if (isInSourceRegion) {
+    // Check if all bytes are ASCII, use `utf8Slice` if not
+    for (let i = pos; i < end; i++) if (uint8[i] >= 128) return utf8Slice.call(uint8, pos, end);
+    // String is all ASCII, so slice from `sourceTextLatin`
+    return sourceTextLatin.substr(pos - sourceStartPos, len);
+  }
+  // String is not in source region - use `fromCharCode.apply` with a temp array of correct length.
+  // Copy bytes into temp array.
+  // If any byte is non-ASCII, use `utf8Slice`.
+  let arr = stringDecodeArrays[len];
+  for (let i = 0; i < len; i++) {
+    let b = uint8[pos + i];
+    if (b >= 128) return utf8Slice.call(uint8, pos, end);
+    arr[i] = b;
+  }
+  // Call `fromCharCode` with temp array
+  return fromCharCode.apply(null, arr);
 }
 
 function deserializeVecDirective(pos) {
