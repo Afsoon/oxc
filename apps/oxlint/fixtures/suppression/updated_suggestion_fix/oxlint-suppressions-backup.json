@@ -3,7 +3,7 @@
     "eslint/no-compare-neg-zero": {
       "count": 1
     },
-    "typescript-eslint/await-thenable": {
+    "typescript/await-thenable": {
       "count": 1
     }
   }

@@ -7,6 +7,7 @@
 #![expect(clippy::missing_errors_doc)]
 
 use std::{
+    borrow::Cow,
     iter, mem,
     path::Path,
     ptr::{self, NonNull},
@@ -79,7 +80,7 @@ pub use crate::{
         JsFix, LintFileResult, LoadPluginResult, convert_and_merge_js_fixes,
     },
     external_plugin_store::{ExternalOptionsId, ExternalPluginStore, ExternalRuleId},
-    fixer::{Fix, FixKind, Fixer, Message, PossibleFixes},
+    fixer::{Fix, FixKind, Fixer, Message, MessageRule, PossibleFixes},
     frameworks::FrameworkFlags,
     lint_runner::{DirectivesStore, LintRunner, LintRunnerBuilder},
     loader::LINTABLE_EXTENSIONS,
@@ -773,13 +774,19 @@ impl Linter {
                         PossibleFixes::from(fix)
                     };
 
-                    ctx_host.push_diagnostic(Message::new(
-                        OxcDiagnostic::error(diagnostic.message)
-                            .with_label(span)
-                            .with_error_code(plugin_name.to_string(), rule_name.to_string())
-                            .with_severity(severity.into()),
-                        possible_fixes,
-                    ));
+                    ctx_host.push_diagnostic(
+                        Message::new(
+                            OxcDiagnostic::error(diagnostic.message)
+                                .with_label(span)
+                                .with_error_code(plugin_name.to_string(), rule_name.to_string())
+                                .with_severity(severity.into()),
+                            possible_fixes,
+                        )
+                        .with_rule(MessageRule {
+                            plugin_name: Cow::Owned(plugin_name.to_string()),
+                            rule_name: Cow::Owned(rule_name.to_string()),
+                        }),
+                    );
                 }
             }
             Err(err) => {

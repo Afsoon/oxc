@@ -6,10 +6,10 @@
     "eslint/prefer-const": {
       "count": 1
     },
-    "typescript-eslint/array-type": {
+    "typescript/array-type": {
       "count": 1
     },
-    "typescript-eslint/await-thenable": {
+    "typescript/await-thenable": {
       "count": 1
     }
   }

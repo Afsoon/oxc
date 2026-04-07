@@ -3,7 +3,7 @@
     "eslint/no-unused-vars": {
       "count": 2
     },
-    "typescript-eslint/await-thenable": {
+    "typescript/await-thenable": {
       "count": 1
     }
   }

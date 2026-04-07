@@ -37,23 +37,10 @@ impl TryFrom<&Message> for RuleName {
     type Error = String;
 
     fn try_from(value: &Message) -> Result<Self, Self::Error> {
-        let error_ref = value.error.as_ref();
-
-        if !error_ref.code.is_some() {
-            return Err("Message lack of an error code".to_string());
+        match &value.rule {
+            Some(rule) => Ok(RuleName::new(&rule.plugin_name, &rule.rule_name)),
+            None => Err("Message has no associated rule".to_string()),
         }
-
-        let plugin_name = match error_ref.code.scope {
-            Some(ref scope) => scope,
-            None => "",
-        };
-
-        let rule_name = match error_ref.code.number {
-            Some(ref number) => number,
-            None => "",
-        };
-
-        Ok(RuleName::new(plugin_name, rule_name))
     }
 }
 
