@@ -21,6 +21,12 @@ fn expect_in_unhandled_promise(span: Span) -> OxcDiagnostic {
         .with_label(span)
 }
 
+fn expect_in_promise_after_return(span: Span) -> OxcDiagnostic {
+    OxcDiagnostic::warn("Expect in a promise chain is unreachable after a `return` statement")
+        .with_help("Move the promise before the `return` and ensure it is awaited or returned.")
+        .with_label(span)
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct ValidExpectInPromise;
 
@@ -97,10 +103,10 @@ declare_oxc_lint!(
 impl Rule for ValidExpectInPromise {
     fn run_on_jest_node<'a, 'c>(
         &self,
-        jest_node: &PossibleJestNode<'a, 'c>,
+        possible_jest_node: &PossibleJestNode<'a, 'c>,
         ctx: &'c LintContext<'a>,
     ) {
-        let node = jest_node.node;
+        let node = possible_jest_node.node;
 
         let AstKind::CallExpression(call_expr) = node.kind() else {
             return;
@@ -110,7 +116,8 @@ impl Rule for ValidExpectInPromise {
             return;
         }
 
-        let Some(parsed_jest_fn) = parse_general_jest_fn_call(call_expr, jest_node, ctx) else {
+        let Some(parsed_jest_fn) = parse_general_jest_fn_call(call_expr, possible_jest_node, ctx)
+        else {
             return;
         };
 
@@ -126,22 +133,9 @@ impl Rule for ValidExpectInPromise {
             return;
         };
 
-        let Some(callback_body) = get_callback_body(callback) else {
+        let Some(callback_body) = get_checkable_callback_body(callback) else {
             return;
         };
-
-        // If the callback has any parameters, the test uses callback-style async
-        // (the param is `done`) — promise handling is not required.
-        // For `.each()` variants, the original rule also bails on any param.
-        if get_callback_param_count(callback) > 0 {
-            return;
-        }
-
-        // Arrow with expression body: `() => expr` — the expression is implicitly returned.
-        // This is always valid (the promise is returned from the test).
-        if is_expression_arrow(callback) {
-            return;
-        }
 
         let mut pending_promises: FxHashMap<CompactStr, Span> = FxHashMap::default();
         let mut return_found = false;
@@ -153,9 +147,8 @@ impl Rule for ValidExpectInPromise {
             ctx,
         );
 
-        // Everything still in pending_promises was never properly awaited or returned
-        for (_name, span) in &pending_promises {
-            ctx.diagnostic(expect_in_unhandled_promise(*span));
+        for &span in pending_promises.values().into_iter() {
+            ctx.diagnostic(expect_in_unhandled_promise(span));
         }
     }
 }
@@ -167,30 +160,37 @@ fn process_statements<'a>(
     ctx: &LintContext<'a>,
 ) {
     for statement in statements {
-        // Single-pass scan: detect promise+expect AND resolved identifiers
         let mut scanner = PromiseExpectScanner::new();
         scanner.visit_statement(statement);
 
         // After a return, any statement with expect-in-promise is unreachable.
         if *return_found {
             if scanner.found_expect_in_promise {
-                ctx.diagnostic(expect_in_unhandled_promise(statement.span()));
+                ctx.diagnostic(expect_in_promise_after_return(statement.span()));
             }
             continue;
         }
 
+        let is_assignment = matches!(
+            statement,
+            Statement::ExpressionStatement(e)
+                if matches!(e.expression, Expression::AssignmentExpression(_))
+        );
+        let is_block = matches!(statement, Statement::BlockStatement(_));
+
+        // Assignments handle resolution manually (reassignment may invalidate old promises).
+        // Blocks recurse into `process_statements` instead.
+        if !is_assignment && !is_block {
+            resolve_pending_promises(pending_promises, &scanner.resolved_names);
+        }
+
         match statement {
             Statement::VariableDeclaration(decl) => {
-                for name in &scanner.resolved_names {
-                    pending_promises.remove(name.as_str());
-                }
                 for declarator in &decl.declarations {
-                    let Some(init) = &declarator.init else {
-                        continue;
-                    };
-                    let Some(ident) = declarator.id.get_binding_identifier() else {
-                        continue;
-                    };
+                    let Some(init) = &declarator.init else { continue };
+                    let Some(ident) = declarator.id.get_binding_identifier() else { continue };
+                    // Per-declarator scan: `let x = 1, promise = getPromise().then(...)` —
+                    // only track the declarator that actually has expect-in-promise.
                     let mut init_scanner = PromiseExpectScanner::new();
                     init_scanner.visit_expression(init);
                     if init_scanner.found_expect_in_promise {
@@ -199,88 +199,62 @@ fn process_statements<'a>(
                     }
                 }
             }
-            Statement::ExpressionStatement(expr_stmt) => match &expr_stmt.expression {
-                Expression::AssignmentExpression(assign_expr) => {
+            Statement::ExpressionStatement(expr_stmt) => {
+                if let Expression::AssignmentExpression(assign_expr) = &expr_stmt.expression {
                     if let Some(name) = assign_expr
                         .left
                         .as_simple_assignment_target()
                         .and_then(|t| t.get_identifier_name())
                     {
-                        let rhs_references_self =
-                            expression_contains_identifier(&assign_expr.right, name);
-
-                        if !rhs_references_self {
+                        if !expression_contains_identifier(&assign_expr.right, name) {
                             if let Some(old_span) =
                                 pending_promises.remove(CompactStr::from(name).as_str())
                             {
                                 ctx.diagnostic(expect_in_unhandled_promise(old_span));
                             }
                         }
-
-                        let mut assign_scanner = PromiseExpectScanner::new();
-                        assign_scanner.visit_expression(&assign_expr.right);
-                        if assign_scanner.found_expect_in_promise {
+                        if scanner.found_expect_in_promise {
                             pending_promises.insert(CompactStr::from(name), expr_stmt.span);
                         }
-                    } else {
-                        if scanner.found_expect_in_promise {
-                            ctx.diagnostic(expect_in_unhandled_promise(expr_stmt.span));
-                        }
-                    }
-                }
-                Expression::AwaitExpression(_) => {
-                    for name in &scanner.resolved_names {
-                        pending_promises.remove(name.as_str());
-                    }
-                }
-                _ => {
-                    for name in &scanner.resolved_names {
-                        pending_promises.remove(name.as_str());
-                    }
-                    if scanner.found_expect_in_promise
-                        && is_top_level_promise_chain(&expr_stmt.expression)
-                    {
+                    } else if scanner.found_expect_in_promise {
                         ctx.diagnostic(expect_in_unhandled_promise(expr_stmt.span));
                     }
+                } else if scanner.found_expect_in_promise
+                    && is_top_level_promise_chain(&expr_stmt.expression)
+                {
+                    ctx.diagnostic(expect_in_unhandled_promise(expr_stmt.span));
                 }
-            },
+            }
             Statement::ReturnStatement(return_stmt) => {
-                if let Some(arg) = &return_stmt.argument {
-                    if let Some(name) = ident_name_of(arg) {
-                        pending_promises.remove(name);
-                    }
-                }
-                for name in &scanner.resolved_names {
-                    pending_promises.remove(name.as_str());
+                if let Some(name) = return_stmt.argument.as_ref().and_then(|arg| ident_name_of(arg))
+                {
+                    pending_promises.remove(name);
                 }
                 *return_found = true;
             }
-            // Block statements — recurse to handle reassignments inside blocks
             Statement::BlockStatement(block) => {
                 process_statements(&block.body, pending_promises, return_found, ctx);
             }
-            _ => {
-                for name in &scanner.resolved_names {
-                    pending_promises.remove(name.as_str());
-                }
-            }
+            _ => {}
         }
     }
 }
 
-/// Extracts the identifier name from simple expressions:
-/// - `promise` → Some("promise")
-/// Does NOT handle member expressions or calls — just plain identifiers.
-fn ident_name_of<'a>(expr: &'a Expression<'a>) -> Option<&'a str> {
-    match expr {
-        Expression::Identifier(ident) => Some(ident.name.as_str()),
-        _ => None,
+fn resolve_pending_promises(
+    pending_promises: &mut FxHashMap<CompactStr, Span>,
+    resolved_names: &FxHashSet<CompactStr>,
+) {
+    for name in resolved_names {
+        pending_promises.remove(name.as_str());
     }
+}
+
+fn ident_name_of<'a>(expr: &'a Expression<'a>) -> Option<&'a str> {
+    if let Expression::Identifier(ident) = expr { Some(ident.name.as_str()) } else { None }
 }
 
 /// Walks down the callee chain of `expect(x).resolves.not.toBe(2)` to find
 /// the arguments of the innermost `expect(...)` call.
-/// Handles arbitrary depth of member expression chains.
 fn find_expect_args<'a>(
     call_expr: &'a CallExpression<'a>,
 ) -> Option<&'a oxc_allocator::Vec<'a, Argument<'a>>> {
@@ -289,20 +263,15 @@ fn find_expect_args<'a>(
             return Some(&call_expr.arguments);
         }
     }
-    // Walk through member chain: the callee may be `expect(x).resolves.not.toBe`
-    // We need to find the CallExpression for `expect(x)` inside this chain.
-    find_expect_call_in_chain(&call_expr.callee)
+    find_inner_expect(&call_expr.callee)
 }
 
-fn find_expect_call_in_chain<'a>(
+fn find_inner_expect<'a>(
     expr: &'a Expression<'a>,
 ) -> Option<&'a oxc_allocator::Vec<'a, Argument<'a>>> {
     match expr {
         Expression::CallExpression(call) => find_expect_args(call),
-        _ => {
-            let member = expr.as_member_expression()?;
-            find_expect_call_in_chain(member.object())
-        }
+        _ => find_inner_expect(expr.as_member_expression()?.object()),
     }
 }
 
@@ -327,51 +296,49 @@ impl<'a, 'b> Visit<'a> for IdentifierFinder<'b> {
     }
 }
 
-/// Returns `true` if the expression is directly a promise chain call (`.then/.catch/.finally`)
-/// at the top level, not nested inside object literals or other function arguments.
-/// Follows the chain: `x.then(cb).catch(cb2)` → walks down `.catch` → `.then` → true.
+/// Checks whether the expression statement's outermost call is itself a promise
+/// chain (`.then/.catch/.finally`). This prevents false positives when a `.then()`
+/// with `expect()` is nested deep inside unrelated structures like:
+///
+/// ```js
+/// promiseSomething({
+///   promise: something().then(value => { expect(value).toBe('red'); })
+/// });
+/// ```
+///
+/// Here the scanner finds `expect` inside `.then()`, but the statement's top-level
+/// expression is `promiseSomething(...)` — not a promise chain we can track for
+/// return/await. Since there's no way to ensure this buried promise is handled,
+/// we bail out and don't report.
 fn is_top_level_promise_chain(expr: &Expression) -> bool {
     let Expression::CallExpression(call_expr) = expr else {
         return false;
     };
-    let Some(member) = call_expr.callee.as_member_expression() else {
-        return false;
-    };
-    let Some(prop) = member.static_property_name() else {
-        return false;
-    };
-    if matches!(prop, "then" | "catch" | "finally") {
-        return true;
-    }
-    // Could be `somePromise.then(cb).someOtherMethod()` — check the object
-    false
+    call_expr
+        .callee
+        .as_member_expression()
+        .and_then(|member| member.static_property_name())
+        .is_some_and(|prop| matches!(prop, "then" | "catch" | "finally"))
 }
 
-/// Returns `true` if the callback is an arrow function with an expression body
-/// (i.e. `() => expr` rather than `() => { ... }`), meaning the expression is implicitly returned.
-fn is_expression_arrow(callback: &Argument) -> bool {
-    matches!(callback, Argument::ArrowFunctionExpression(arrow) if arrow.expression)
-}
-
-fn get_callback_body<'a>(callback_argument: &'a Argument<'a>) -> Option<&'a FunctionBody<'a>> {
-    match callback_argument {
-        Argument::ArrowFunctionExpression(arrow_fn) => Some(&arrow_fn.body),
-        Argument::FunctionExpression(fn_expr) => fn_expr.body.as_ref().map(AsRef::as_ref),
+fn get_checkable_callback_body<'a>(callback: &'a Argument<'a>) -> Option<&'a FunctionBody<'a>> {
+    match callback {
+        Argument::ArrowFunctionExpression(arrow) => {
+            if arrow.expression || !arrow.params.items.is_empty() {
+                return None;
+            }
+            Some(&arrow.body)
+        }
+        Argument::FunctionExpression(func) => {
+            if !func.params.items.is_empty() {
+                return None;
+            }
+            func.body.as_ref().map(AsRef::as_ref)
+        }
         _ => None,
     }
 }
 
-fn get_callback_param_count(callback: &Argument) -> usize {
-    match callback {
-        Argument::ArrowFunctionExpression(arrow_fn) => arrow_fn.params.items.len(),
-        Argument::FunctionExpression(fn_expr) => fn_expr.params.items.len(),
-        _ => 0,
-    }
-}
-
-/// Single-pass visitor that walks an expression/statement subtree and detects:
-/// 1. Promise chains (`.then/.catch/.finally`) containing `expect()` calls
-/// 2. Identifiers that are "resolved" — awaited or used in `expect(x).resolves/rejects`
 struct PromiseExpectScanner {
     /// Whether we are currently inside a promise chain callback.
     in_promise_chain: bool,
@@ -393,6 +360,40 @@ impl PromiseExpectScanner {
             resolved_names: FxHashSet::default(),
         }
     }
+
+    fn resolve_ident(&mut self, expr: &Expression) {
+        if let Some(name) = ident_name_of(expr) {
+            self.resolved_names.insert(CompactStr::from(name));
+        }
+    }
+
+    fn collect_resolved_from_promise_wrapper(&mut self, call_expr: &CallExpression) {
+        let Some(member) = call_expr.callee.as_member_expression() else { return };
+        let Expression::Identifier(obj) = member.object() else { return };
+        if obj.name != "Promise" {
+            return;
+        }
+
+        let first_arg = call_expr.arguments.first().and_then(|a| a.as_expression());
+
+        match member.static_property_name() {
+            Some("all" | "allSettled" | "race" | "any") => {
+                if let Some(Expression::ArrayExpression(arr)) = first_arg {
+                    for elem in &arr.elements {
+                        if let Some(expr) = elem.as_expression() {
+                            self.resolve_ident(expr);
+                        }
+                    }
+                }
+            }
+            Some("resolve" | "reject") => {
+                if let Some(expr) = first_arg {
+                    self.resolve_ident(expr);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 impl<'a> Visit<'a> for PromiseExpectScanner {
@@ -402,53 +403,16 @@ impl<'a> Visit<'a> for PromiseExpectScanner {
         if callee_name.first().is_some_and(|n| n == "expect")
             && callee_name.iter().any(|n| n == "resolves" || n == "rejects")
         {
-            if let Some(inner_args) = find_expect_args(call_expr) {
-                if let Some(first_arg) = inner_args.first() {
-                    if let Some(expr) = first_arg.as_expression() {
-                        if let Some(name) = ident_name_of(expr) {
-                            self.resolved_names.insert(CompactStr::from(name));
-                        }
-                    }
-                }
+            if let Some(expr) = find_expect_args(call_expr)
+                .and_then(|args| args.first())
+                .and_then(|arg| arg.as_expression())
+            {
+                self.resolve_ident(expr);
             }
         }
 
-        // Check for `Promise.all([p1, p2])`, `Promise.resolve(p)`, etc.
-        // These resolve the identifiers passed as arguments.
-        if let Some(member) = call_expr.callee.as_member_expression() {
-            if let Expression::Identifier(obj) = member.object() {
-                if obj.name == "Promise" {
-                    let prop = member.static_property_name();
-                    if matches!(prop, Some("all" | "allSettled" | "race" | "any")) {
-                        // First arg is an array: Promise.all([p1, p2])
-                        if let Some(first_arg) = call_expr.arguments.first() {
-                            if let Some(Expression::ArrayExpression(arr)) =
-                                first_arg.as_expression()
-                            {
-                                for elem in &arr.elements {
-                                    if let Some(expr) = elem.as_expression() {
-                                        if let Some(name) = ident_name_of(expr) {
-                                            self.resolved_names.insert(CompactStr::from(name));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else if matches!(prop, Some("resolve" | "reject")) {
-                        // First arg is a single value: Promise.resolve(p)
-                        if let Some(first_arg) = call_expr.arguments.first() {
-                            if let Some(expr) = first_arg.as_expression() {
-                                if let Some(name) = ident_name_of(expr) {
-                                    self.resolved_names.insert(CompactStr::from(name));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        self.collect_resolved_from_promise_wrapper(call_expr);
 
-        // Check if this call is to `.then()`, `.catch()`, or `.finally()`
         let is_chain_call = call_expr
             .callee
             .as_member_expression()
@@ -457,10 +421,12 @@ impl<'a> Visit<'a> for PromiseExpectScanner {
 
         if is_chain_call {
             let was_in_chain = self.in_promise_chain;
+
             // Only flag as promise chain if not already inside an await
             self.in_promise_chain = !self.in_await;
-            // Walk the callee (handles chaining: x.then(cb1).catch(cb2))
+
             self.visit_expression(&call_expr.callee);
+
             // Only walk the first 2 arguments of .then/.catch/.finally
             // (.then takes at most 2 callbacks; 3rd+ args are non-standard)
             for arg in call_expr.arguments.iter().take(2) {
@@ -470,7 +436,6 @@ impl<'a> Visit<'a> for PromiseExpectScanner {
             return;
         }
 
-        // If we're inside a promise chain and see `expect(...)`, flag it
         if self.in_promise_chain {
             if callee_name.first().is_some_and(|n| n == "expect") {
                 self.found_expect_in_promise = true;
@@ -482,11 +447,7 @@ impl<'a> Visit<'a> for PromiseExpectScanner {
     }
 
     fn visit_await_expression(&mut self, await_expr: &oxc_ast::ast::AwaitExpression<'a>) {
-        // `await promise` → mark identifier as resolved
-        if let Some(name) = ident_name_of(&await_expr.argument) {
-            self.resolved_names.insert(CompactStr::from(name));
-        }
-        // Mark that we're inside await — any promise chain inside is already handled
+        self.resolve_ident(&await_expr.argument);
         let was_in_await = self.in_await;
         self.in_await = true;
         walk::walk_await_expression(self, await_expr);
