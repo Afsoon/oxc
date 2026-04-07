@@ -1,9 +1,9 @@
 {
   "files/test.ts": {
-    "eslint/no-console": {
+    "no-console": {
       "count": 1
     },
-    "eslint/no-unused-vars": {
+    "no-unused-vars": {
       "count": 4
     },
     "typescript/await-thenable": {

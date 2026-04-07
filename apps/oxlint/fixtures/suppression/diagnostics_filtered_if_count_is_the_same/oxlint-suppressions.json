@@ -1,14 +1,14 @@
 {
   "folder_a/test.js": {
-    "eslint/no-console": {
+    "no-console": {
       "count": 1
     }
   },
   "folder_b/test.ts": {
-    "eslint/no-console": {
+    "no-console": {
       "count": 1
     },
-    "eslint/no-unused-vars": {
+    "no-unused-vars": {
       "count": 3
     },
     "typescript/array-type": {

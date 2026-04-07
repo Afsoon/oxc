@@ -1,6 +1,6 @@
 {
   "files/test.ts": {
-    "eslint/no-unused-vars": {
+    "no-unused-vars": {
       "count": 2
     },
     "typescript/await-thenable": {

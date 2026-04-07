@@ -1,11 +1,11 @@
 {
   "deleted_file.js": {
-    "eslint/no-console": {
+    "no-console": {
       "count": 3
     }
   },
   "folder_a/test.js": {
-    "eslint/no-console": {
+    "no-console": {
       "count": 1
     }
   }

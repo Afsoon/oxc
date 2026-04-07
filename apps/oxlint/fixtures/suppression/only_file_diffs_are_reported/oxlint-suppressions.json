@@ -1,11 +1,11 @@
 {
   "folder_a/test.js": {
-    "eslint/no-console": {
+    "no-console": {
       "count": 1
     }
   },
   "folder_b/test.js": {
-    "eslint/no-console": {
+    "no-console": {
       "count": 1
     }
   }

@@ -1,6 +1,6 @@
 {
   "folder_a/test.js": {
-    "eslint/no-console": {
+    "no-console": {
       "count": 3
     }
   }

@@ -1,9 +1,9 @@
 {
   "files/test.ts": {
-    "eslint/no-unused-vars": {
+    "no-unused-vars": {
       "count": 3
     },
-    "eslint/prefer-const": {
+    "prefer-const": {
       "count": 1
     },
     "typescript/array-type": {

@@ -1,9 +1,9 @@
 {
   "files/test.ts": {
-    "eslint/no-debugger": {
+    "no-debugger": {
       "count": 1
     },
-    "eslint/no-eq-null": {
+    "no-eq-null": {
       "count": 1
     },
     "typescript/array-type": {
