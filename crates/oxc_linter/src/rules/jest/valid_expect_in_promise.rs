@@ -41,26 +41,53 @@ declare_oxc_lint!(
     ///
     /// Examples of **incorrect** code for this rule:
     /// ```javascript
-    /// it('tests something', () => {
-    ///   somePromise.then(value => {
-    ///     expect(value).toBe('foo');
-    ///   });
-    /// });
+    /// test('promise test', async () => {
+    ///   something().then((value) => {
+    ///     expect(value).toBe('red')
+    ///   })
+    /// })
+    ///
+    /// test('promises test', () => {
+    ///   const onePromise = something().then((value) => {
+    ///     expect(value).toBe('red')
+    ///   })
+    ///   const twoPromise = something().then((value) => {
+    ///     expect(value).toBe('blue')
+    ///   })
+    ///
+    ///   return Promise.any([onePromise, twoPromise])
+    /// })
     /// ```
     ///
     /// Examples of **correct** code for this rule:
     /// ```javascript
-    /// it('tests something', async () => {
-    ///   await somePromise.then(value => {
-    ///     expect(value).toBe('foo');
-    ///   });
-    /// });
+    /// test('promise test', async () => {
+    ///   await something().then((value) => {
+    ///     expect(value).toBe('red')
+    ///   })
+    /// })
     ///
-    /// it('tests something', () => {
-    ///   return somePromise.then(value => {
-    ///     expect(value).toBe('foo');
-    ///   });
-    /// });
+    /// test('promises test', () => {
+    ///   const onePromise = something().then((value) => {
+    ///     expect(value).toBe('red')
+    ///   })
+    ///   const twoPromise = something().then((value) => {
+    ///     expect(value).toBe('blue')
+    ///   })
+    ///
+    ///   return Promise.all([onePromise, twoPromise])
+    /// })
+    /// ```
+    ///
+    /// This rule is compatible with [eslint-plugin-vitest](https://github.com/vitest-dev/eslint-plugin-vitest/blob/main/docs/rules/valid-expect-in-promise.md),
+    /// to use it, add the following configuration to your `.oxlintrc.json`:
+    ///
+    /// ```json
+    /// {
+    ///   "rules": {
+    ///     "vitest/valid-expect-in-promise": "error"
+    ///   }
+    /// }
     /// ```
     ValidExpectInPromise,
     jest,
@@ -172,57 +199,51 @@ fn process_statements<'a>(
                     }
                 }
             }
-            Statement::ExpressionStatement(expr_stmt) => {
-                match &expr_stmt.expression {
-                    Expression::AssignmentExpression(assign_expr) => {
-                        if let Some(name) =
-                            assign_expr.left.as_simple_assignment_target()
-                                .and_then(|t| t.get_identifier_name())
-                        {
-                            let rhs_references_self =
-                                expression_contains_identifier(&assign_expr.right, name);
+            Statement::ExpressionStatement(expr_stmt) => match &expr_stmt.expression {
+                Expression::AssignmentExpression(assign_expr) => {
+                    if let Some(name) = assign_expr
+                        .left
+                        .as_simple_assignment_target()
+                        .and_then(|t| t.get_identifier_name())
+                    {
+                        let rhs_references_self =
+                            expression_contains_identifier(&assign_expr.right, name);
 
-                            if !rhs_references_self {
-                                if let Some(old_span) =
-                                    pending_promises.remove(CompactStr::from(name).as_str())
-                                {
-                                    ctx.diagnostic(expect_in_unhandled_promise(old_span));
-                                }
+                        if !rhs_references_self {
+                            if let Some(old_span) =
+                                pending_promises.remove(CompactStr::from(name).as_str())
+                            {
+                                ctx.diagnostic(expect_in_unhandled_promise(old_span));
                             }
+                        }
 
-                            let mut assign_scanner = PromiseExpectScanner::new();
-                            assign_scanner.visit_expression(&assign_expr.right);
-                            if assign_scanner.found_expect_in_promise {
-                                pending_promises
-                                    .insert(CompactStr::from(name), expr_stmt.span);
-                            }
-                        } else {
-                            if scanner.found_expect_in_promise {
-                                ctx.diagnostic(expect_in_unhandled_promise(
-                                    expr_stmt.span,
-                                ));
-                            }
+                        let mut assign_scanner = PromiseExpectScanner::new();
+                        assign_scanner.visit_expression(&assign_expr.right);
+                        if assign_scanner.found_expect_in_promise {
+                            pending_promises.insert(CompactStr::from(name), expr_stmt.span);
                         }
-                    }
-                    Expression::AwaitExpression(_) => {
-                        for name in &scanner.resolved_names {
-                            pending_promises.remove(name.as_str());
-                        }
-                    }
-                    _ => {
-                        for name in &scanner.resolved_names {
-                            pending_promises.remove(name.as_str());
-                        }
-                        if scanner.found_expect_in_promise
-                            && is_top_level_promise_chain(&expr_stmt.expression)
-                        {
-                            ctx.diagnostic(expect_in_unhandled_promise(
-                                expr_stmt.span,
-                            ));
+                    } else {
+                        if scanner.found_expect_in_promise {
+                            ctx.diagnostic(expect_in_unhandled_promise(expr_stmt.span));
                         }
                     }
                 }
-            }
+                Expression::AwaitExpression(_) => {
+                    for name in &scanner.resolved_names {
+                        pending_promises.remove(name.as_str());
+                    }
+                }
+                _ => {
+                    for name in &scanner.resolved_names {
+                        pending_promises.remove(name.as_str());
+                    }
+                    if scanner.found_expect_in_promise
+                        && is_top_level_promise_chain(&expr_stmt.expression)
+                    {
+                        ctx.diagnostic(expect_in_unhandled_promise(expr_stmt.span));
+                    }
+                }
+            },
             Statement::ReturnStatement(return_stmt) => {
                 if let Some(arg) = &return_stmt.argument {
                     if let Some(name) = ident_name_of(arg) {
@@ -236,12 +257,7 @@ fn process_statements<'a>(
             }
             // Block statements — recurse to handle reassignments inside blocks
             Statement::BlockStatement(block) => {
-                process_statements(
-                    &block.body,
-                    pending_promises,
-                    return_found,
-                    ctx,
-                );
+                process_statements(&block.body, pending_promises, return_found, ctx);
             }
             _ => {
                 for name in &scanner.resolved_names {
@@ -265,7 +281,9 @@ fn ident_name_of<'a>(expr: &'a Expression<'a>) -> Option<&'a str> {
 /// Walks down the callee chain of `expect(x).resolves.not.toBe(2)` to find
 /// the arguments of the innermost `expect(...)` call.
 /// Handles arbitrary depth of member expression chains.
-fn find_expect_args<'a>(call_expr: &'a CallExpression<'a>) -> Option<&'a oxc_allocator::Vec<'a, Argument<'a>>> {
+fn find_expect_args<'a>(
+    call_expr: &'a CallExpression<'a>,
+) -> Option<&'a oxc_allocator::Vec<'a, Argument<'a>>> {
     if let Expression::Identifier(ident) = &call_expr.callee {
         if ident.name == "expect" {
             return Some(&call_expr.arguments);
@@ -276,7 +294,9 @@ fn find_expect_args<'a>(call_expr: &'a CallExpression<'a>) -> Option<&'a oxc_all
     find_expect_call_in_chain(&call_expr.callee)
 }
 
-fn find_expect_call_in_chain<'a>(expr: &'a Expression<'a>) -> Option<&'a oxc_allocator::Vec<'a, Argument<'a>>> {
+fn find_expect_call_in_chain<'a>(
+    expr: &'a Expression<'a>,
+) -> Option<&'a oxc_allocator::Vec<'a, Argument<'a>>> {
     match expr {
         Expression::CallExpression(call) => find_expect_args(call),
         _ => {
@@ -402,7 +422,9 @@ impl<'a> Visit<'a> for PromiseExpectScanner {
                     if matches!(prop, Some("all" | "allSettled" | "race" | "any")) {
                         // First arg is an array: Promise.all([p1, p2])
                         if let Some(first_arg) = call_expr.arguments.first() {
-                            if let Some(Expression::ArrayExpression(arr)) = first_arg.as_expression() {
+                            if let Some(Expression::ArrayExpression(arr)) =
+                                first_arg.as_expression()
+                            {
                                 for elem in &arr.elements {
                                     if let Some(expr) = elem.as_expression() {
                                         if let Some(name) = ident_name_of(expr) {
@@ -476,7 +498,7 @@ impl<'a> Visit<'a> for PromiseExpectScanner {
 fn test() {
     use crate::tester::Tester;
 
-    let pass = vec![
+    let mut pass = vec![
         ("test('something', () => Promise.resolve().then(() => expect(1).toBe(2)));", None, None),
         ("Promise.resolve().then(() => expect(1).toBe(2))", None, None),
         ("const x = Promise.resolve().then(() => expect(1).toBe(2))", None, None),
@@ -1399,7 +1421,7 @@ fn test() {
         ),
     ];
 
-    let fail = vec![
+    let mut fail = vec![
         (
             "const myFn = () => {
               Promise.resolve().then(() => {
@@ -1970,7 +1992,1888 @@ fn test() {
          */
     ];
 
+    let vitest_pass = vec![
+        ("test('something', () => Promise.resolve().then(() => expect(1).toBe(2)));", None, None),
+        ("Promise.resolve().then(() => expect(1).toBe(2))", None, None),
+        ("const x = Promise.resolve().then(() => expect(1).toBe(2))", None, None),
+        (
+            "
+                  it('is valid', () => {
+                    const promise = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+
+                      return number + 1;
+                    });
+
+                    expect(promise).resolves.toBe(1);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', () => {
+                    const promise = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+
+                      return number + 1;
+                    });
+
+                    expect(promise).resolves.not.toBe(2);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', () => {
+                    const promise = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+
+                      return number + 1;
+                    });
+
+                    expect(promise).rejects.toBe(1);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', () => {
+                    const promise = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+
+                      return number + 1;
+                    });
+
+                    expect(promise).rejects.not.toBe(2);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', async () => {
+                    const promise = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+
+                      return number + 1;
+                    });
+
+                    expect(await promise).toBeGreaterThan(1);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', async () => {
+                    const promise = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+
+                      return number + 1;
+                    });
+
+                    expect(await promise).resolves.toBeGreaterThan(1);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', async () => {
+                    const promise = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+
+                      return number + 1;
+                    });
+
+                    expect(1).toBeGreaterThan(await promise);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', async () => {
+                    const promise = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+
+                      return number + 1;
+                    });
+
+                    expect.this.that.is(await promise);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', async () => {
+                    expect(await loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+
+                      return number + 1;
+                    })).toBeGreaterThan(1);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', async () => {
+                    const promise = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+
+                      return number + 1;
+                    });
+
+                    expect([await promise]).toHaveLength(1);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', async () => {
+                    const promise = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+
+                      return number + 1;
+                    });
+
+                    expect([,,await promise,,]).toHaveLength(1);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', async () => {
+                    const promise = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+
+                      return number + 1;
+                    });
+
+                    expect([[await promise]]).toHaveLength(1);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', async () => {
+                    const promise = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+
+                      return number + 1;
+                    });
+
+                    logValue(await promise);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', async () => {
+                    const promise = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+
+                      return 1;
+                    });
+
+                    expect.assertions(await promise);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', async () => {
+                    await loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', () => new Promise((done) => {
+                    test()
+                      .then(() => {
+                        expect(someThing).toEqual(true);
+                        done();
+                      });
+                  }));
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', () => {
+                    return new Promise(done => {
+                      test().then(() => {
+                        expect(someThing).toEqual(true);
+                        done();
+                      });
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('passes', () => {
+                    Promise.resolve().then(() => {
+                      grabber.grabSomething();
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('passes', async () => {
+                    const grabbing = Promise.resolve().then(() => {
+                      grabber.grabSomething();
+                    });
+
+                    await grabbing;
+
+                    expect(grabber.grabbedItems).toHaveLength(1);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  const myFn = () => {
+                    Promise.resolve().then(() => {
+                      expect(true).toBe(false);
+                    });
+                  };
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  const myFn = () => {
+                    Promise.resolve().then(() => {
+                      subject.invokeMethod();
+                    });
+                  };
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  const myFn = () => {
+                    Promise.resolve().then(() => {
+                      expect(true).toBe(false);
+                    });
+                  };
+
+                  it('it1', () => {
+                    return somePromise.then(() => {
+                      expect(someThing).toEqual(true);
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', () => new Promise((done) => {
+                    test()
+                      .finally(() => {
+                        expect(someThing).toEqual(true);
+                        done();
+                      });
+                  }));
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', () => {
+                    return somePromise.then(() => {
+                      expect(someThing).toEqual(true);
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', () => {
+                    return somePromise.finally(() => {
+                      expect(someThing).toEqual(true);
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', function() {
+                    return somePromise.catch(function() {
+                      expect(someThing).toEqual(true);
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  xtest('it1', function() {
+                    return somePromise.catch(function() {
+                      expect(someThing).toEqual(true);
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', function() {
+                    return somePromise.then(function() {
+                      doSomeThingButNotExpect();
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', function() {
+                    return getSomeThing().getPromise().then(function() {
+                      expect(someThing).toEqual(true);
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', function() {
+                    return Promise.resolve().then(function() {
+                      expect(someThing).toEqual(true);
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', function () {
+                    return Promise.resolve().then(function () {
+                      /*fulfillment*/
+                      expect(someThing).toEqual(true);
+                    }, function () {
+                      /*rejection*/
+                      expect(someThing).toEqual(true);
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', function () {
+                    Promise.resolve().then(/*fulfillment*/ function () {
+                    }, undefined, /*rejection*/ function () {
+                      expect(someThing).toEqual(true)
+                    })
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', function () {
+                    return Promise.resolve().then(function () {
+                      /*fulfillment*/
+                    }, function () {
+                      /*rejection*/
+                      expect(someThing).toEqual(true);
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', function () {
+                    return somePromise.then()
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', async () => {
+                    await Promise.resolve().then(function () {
+                      expect(someThing).toEqual(true)
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', async () => {
+                    await somePromise.then(() => {
+                      expect(someThing).toEqual(true)
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', async () => {
+                    await getSomeThing().getPromise().then(function () {
+                      expect(someThing).toEqual(true)
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', () => {
+                    return somePromise.then(() => {
+                      expect(someThing).toEqual(true);
+                    })
+                    .then(() => {
+                      expect(someThing).toEqual(true);
+                    })
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', () => {
+                    return somePromise.then(() => {
+                      return value;
+                    })
+                    .then(value => {
+                      expect(someThing).toEqual(value);
+                    })
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', () => {
+                    return somePromise.then(() => {
+                      expect(someThing).toEqual(true);
+                    })
+                    .then(() => {
+                      console.log('this is silly');
+                    })
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('it1', () => {
+                    return somePromise.then(() => {
+                      expect(someThing).toEqual(true);
+                    })
+                    .catch(() => {
+                      expect(someThing).toEqual(false);
+                    })
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('later return', () => {
+                    const promise = something().then(value => {
+                      expect(value).toBe('red');
+                    });
+
+                    return promise;
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('later return', async () => {
+                    const promise = something().then(value => {
+                      expect(value).toBe('red');
+                    });
+
+                    await promise;
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test.only('later return', () => {
+                    const promise = something().then(value => {
+                      expect(value).toBe('red');
+                    });
+
+                    return promise;
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('that we bailout if destructuring is used', () => {
+                    const [promise] = something().then(value => {
+                      expect(value).toBe('red');
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('that we bailout if destructuring is used', async () => {
+                    const [promise] = await something().then(value => {
+                      expect(value).toBe('red');
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('that we bailout if destructuring is used', () => {
+                    const [promise] = [
+                      something().then(value => {
+                        expect(value).toBe('red');
+                      })
+                    ];
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('that we bailout if destructuring is used', () => {
+                    const {promise} = {
+                      promise: something().then(value => {
+                        expect(value).toBe('red');
+                      })
+                    };
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('that we bailout in complex cases', () => {
+                    promiseSomething({
+                      timeout: 500,
+                      promise: something().then(value => {
+                        expect(value).toBe('red');
+                      })
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('shorthand arrow', () =>
+                    something().then(value => {
+                      expect(() => {
+                        value();
+                      }).toThrow();
+                    })
+                  );
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('crawls for files based on patterns', () => {
+                    const promise = nodeCrawl({}).then(data => {
+                      expect(childProcess.spawn).lastCalledWith('find');
+                    });
+                    return promise;
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is a test', async () => {
+                    const value = await somePromise().then(response => {
+                      expect(response).toHaveProperty('data');
+
+                      return response.data;
+                    });
+
+                    expect(value).toBe('hello world');
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is a test', async () => {
+                    return await somePromise().then(response => {
+                      expect(response).toHaveProperty('data');
+
+                      return response.data;
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is a test', async () => {
+                    return somePromise().then(response => {
+                      expect(response).toHaveProperty('data');
+
+                      return response.data;
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is a test', async () => {
+                    await somePromise().then(response => {
+                      expect(response).toHaveProperty('data');
+
+                      return response.data;
+                    });
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it(
+                    'test function',
+                    () => {
+                      return Builder
+                        .getPromiseBuilder()
+                        .get().build()
+                        .then((data) => {
+                          expect(data).toEqual('Hi');
+                        });
+                    }
+                  );
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  notATestFunction(
+                    'not a test function',
+                    () => {
+                      Builder
+                        .getPromiseBuilder()
+                        .get()
+                        .build()
+                        .then((data) => {
+                          expect(data).toEqual('Hi');
+                        });
+                    }
+                  );
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('is valid', async () => {
+                    const promiseOne = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+                    });
+                    const promiseTwo = loadNumber().then(number => {
+                      expect(typeof number).toBe('number');
+                    });
+
+                    await promiseTwo;
+                    await promiseOne;
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            r#"
+                  it("it1", () => somePromise.then(() => {
+                    expect(someThing).toEqual(true)
+                  }))
+                "#,
+            None,
+            None,
+        ),
+        (r#"it("it1", () => somePromise.then(() => expect(someThing).toEqual(true)))"#, None, None),
+        (
+            "
+                  it('promise test with done', (done) => {
+                    const promise = getPromise();
+                    promise.then(() => expect(someThing).toEqual(true));
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it('name of done param does not matter', (nameDoesNotMatter) => {
+                    const promise = getPromise();
+                    promise.then(() => expect(someThing).toEqual(true));
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it.each([])('name of done param does not matter', (nameDoesNotMatter) => {
+                    const promise = getPromise();
+                    promise.then(() => expect(someThing).toEqual(true));
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  it.each``('name of done param does not matter', ({}, nameDoesNotMatter) => {
+                    const promise = getPromise();
+                    promise.then(() => expect(someThing).toEqual(true));
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('valid-expect-in-promise', async () => {
+                    const text = await fetch('url')
+                        .then(res => res.text())
+                        .then(text => text);
+
+                    expect(text).toBe('text');
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    let somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    }), x = 1;
+
+                    await somePromise;
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    let x = 1, somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    await somePromise;
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    let somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    await somePromise;
+
+                    somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    await somePromise;
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    let somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    await somePromise;
+
+                    somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    return somePromise;
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    let somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    {}
+
+                    await somePromise;
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    const somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    {
+                      await somePromise;
+                    }
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    let somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    {
+                      await somePromise;
+
+                      somePromise = getPromise().then((data) => {
+                        expect(data).toEqual('foo');
+                      });
+
+                      await somePromise;
+                    }
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    let somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    await somePromise;
+
+                    {
+                      somePromise = getPromise().then((data) => {
+                        expect(data).toEqual('foo');
+                      });
+
+                      await somePromise;
+                    }
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    let somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    somePromise = somePromise.then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    await somePromise;
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    let somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    somePromise = somePromise
+                      .then((data) => data)
+                      .then((data) => data)
+                      .then((data) => {
+                        expect(data).toEqual('foo');
+                      });
+
+                    await somePromise;
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    let somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    somePromise = somePromise
+                      .then((data) => data)
+                      .then((data) => data)
+
+                    await somePromise;
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    let somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    await somePromise;
+
+                    {
+                      somePromise = getPromise().then((data) => {
+                        expect(data).toEqual('foo');
+                      });
+
+                      {
+                        await somePromise;
+                      }
+                    }
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    const somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    await Promise.all([somePromise]);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    const somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    return Promise.all([somePromise]);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    const somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    return Promise.resolve(somePromise);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    const somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    return Promise.reject(somePromise);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    const somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    await Promise.resolve(somePromise);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('promise test', async function () {
+                    const somePromise = getPromise().then((data) => {
+                      expect(data).toEqual('foo');
+                    });
+
+                    await Promise.reject(somePromise);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('later return', async () => {
+                    const onePromise = something().then(value => {
+                      console.log(value);
+                    });
+                    const twoPromise = something().then(value => {
+                      expect(value).toBe('red');
+                    });
+
+                    return Promise.all([onePromise, twoPromise]);
+                  });
+                ",
+            None,
+            None,
+        ),
+        (
+            "
+                  test('later return', async () => {
+                    const onePromise = something().then(value => {
+                      console.log(value);
+                    });
+                    const twoPromise = something().then(value => {
+                      expect(value).toBe('red');
+                    });
+
+                    return Promise.allSettled([onePromise, twoPromise]);
+                  });
+                ",
+            None,
+            None,
+        ),
+    ];
+
+    pass.extend(vitest_pass);
+
+    let vitest_fail = vec![
+        (
+            "
+                    const myFn = () => {
+                      Promise.resolve().then(() => {
+                        expect(true).toBe(false);
+                      });
+                    };
+
+                    it('it1', () => {
+                      somePromise.then(() => {
+                        expect(someThing).toEqual(true);
+                      });
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('it1', () => {
+                      somePromise.then(() => {
+                        expect(someThing).toEqual(true);
+                      });
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('it1', () => {
+                      somePromise.finally(() => {
+                        expect(someThing).toEqual(true);
+                      });
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                   it('it1', () => {
+                     somePromise['then'](() => {
+                       expect(someThing).toEqual(true);
+                     });
+                   });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('it1', function() {
+                      getSomeThing().getPromise().then(function() {
+                        expect(someThing).toEqual(true);
+                      });
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('it1', function() {
+                      Promise.resolve().then(function() {
+                        expect(someThing).toEqual(true);
+                      });
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('it1', function() {
+                      somePromise.catch(function() {
+                        expect(someThing).toEqual(true)
+                      })
+                    })
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    xtest('it1', function() {
+                      somePromise.catch(function() {
+                        expect(someThing).toEqual(true)
+                      })
+                    })
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('it1', function() {
+                      somePromise.then(function() {
+                        expect(someThing).toEqual(true)
+                      })
+                    })
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('it1', function () {
+                      Promise.resolve().then(/*fulfillment*/ function () {
+                        expect(someThing).toEqual(true);
+                      }, /*rejection*/ function () {
+                        expect(someThing).toEqual(true);
+                      })
+                    })
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('it1', function () {
+                      Promise.resolve().then(/*fulfillment*/ function () {
+                      }, /*rejection*/ function () {
+                        expect(someThing).toEqual(true)
+                      })
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('test function', () => {
+                      Builder.getPromiseBuilder()
+                        .get()
+                        .build()
+                        .then(data => expect(data).toEqual('Hi'));
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('test function', async () => {
+                      Builder.getPromiseBuilder()
+                        .get()
+                        .build()
+                        .then(data => expect(data).toEqual('Hi'));
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('it1', () => {
+                      somePromise.then(() => {
+                        doSomeOperation();
+                        expect(someThing).toEqual(true);
+                      })
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('is a test', () => {
+                      somePromise
+                        .then(() => {})
+                        .then(() => expect(someThing).toEqual(value))
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('is a test', () => {
+                      somePromise
+                        .then(() => expect(someThing).toEqual(value))
+                        .then(() => {})
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('is a test', () => {
+                      somePromise.then(() => {
+                        return value;
+                      })
+                      .then(value => {
+                        expect(someThing).toEqual(value);
+                      })
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('is a test', () => {
+                      somePromise.then(() => {
+                        expect(someThing).toEqual(true);
+                      })
+                      .then(() => {
+                        console.log('this is silly');
+                      })
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('is a test', () => {
+                      somePromise.then(() => {
+                        // return value;
+                      })
+                      .then(value => {
+                        expect(someThing).toEqual(value);
+                      })
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('is a test', () => {
+                      somePromise.then(() => {
+                        return value;
+                      })
+                      .then(value => {
+                        expect(someThing).toEqual(value);
+                      })
+
+                      return anotherPromise.then(() => expect(x).toBe(y));
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('is a test', () => {
+                      somePromise
+                        .then(() => 1)
+                        .then(x => x + 1)
+                        .catch(() => -1)
+                        .then(v => expect(v).toBe(2));
+
+                      return anotherPromise.then(() => expect(x).toBe(y));
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('is a test', () => {
+                      somePromise
+                        .then(() => 1)
+                        .then(v => expect(v).toBe(2))
+                        .then(x => x + 1)
+                        .catch(() => -1);
+
+                      return anotherPromise.then(() => expect(x).toBe(y));
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('it1', () => {
+                      somePromise.finally(() => {
+                        doSomeOperation();
+                        expect(someThing).toEqual(true);
+                      })
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            r#"
+                    test('invalid return', () => {
+                      const promise = something().then(value => {
+                        const foo = "foo";
+                        return expect(value).toBe('red');
+                      });
+                    });
+                  "#,
+            None,
+            None,
+        ),
+        (
+            "
+                    fit('it1', () => {
+                      somePromise.then(() => {
+                        doSomeOperation();
+                        expect(someThing).toEqual(true);
+                      })
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it.skip('it1', () => {
+                      somePromise.then(() => {
+                        doSomeOperation();
+                        expect(someThing).toEqual(true);
+                      })
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('later return', async () => {
+                      const promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+
+                      promise;
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('later return', async () => {
+                      const promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+
+                      return;
+
+                      await promise;
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('later return', async () => {
+                      const promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+
+                      return 1;
+
+                      await promise;
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('later return', async () => {
+                      const promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+
+                      return [];
+
+                      await promise;
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('later return', async () => {
+                      const promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+
+                      return Promise.all([anotherPromise]);
+
+                      await promise;
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('later return', async () => {
+                      const promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+
+                      return {};
+
+                      await promise;
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('later return', async () => {
+                      const promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+
+                      return Promise.all([]);
+
+                      await promise;
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('later return', async () => {
+                      const promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+
+                      await 1;
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('later return', async () => {
+                      const promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+
+                      await [];
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('later return', async () => {
+                      const promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+
+                      await Promise.all([anotherPromise]);
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('later return', async () => {
+                      const promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+
+                      await {};
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('later return', async () => {
+                      const promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+
+                      await Promise.all([]);
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('later return', async () => {
+                      const promise = something().then(value => {
+                        expect(value).toBe('red');
+                      }), x = 1;
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('later return', async () => {
+                      const x = 1, promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    import { test } from 'vitest';
+
+                    test('later return', async () => {
+                      const x = 1, promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+                    });
+                  ",
+            None,
+            None,
+        ), // { "parserOptions": { "sourceType": "module" }, },
+        (
+            "
+                    it('promise test', () => {
+                      const somePromise = getThatPromise();
+                      somePromise.then((data) => {
+                        expect(data).toEqual('foo');
+                      });
+                      expect(somePromise).toBeDefined();
+                      return somePromise;
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('promise test', function () {
+                      let somePromise = getThatPromise();
+                      somePromise.then((data) => {
+                        expect(data).toEqual('foo');
+                      });
+                      expect(somePromise).toBeDefined();
+                      return somePromise;
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('promise test', async function () {
+                      let somePromise = getPromise().then((data) => {
+                        expect(data).toEqual('foo');
+                      });
+
+                      somePromise = null;
+
+                      await somePromise;
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('promise test', async function () {
+                      let somePromise = getPromise().then((data) => {
+                        expect(data).toEqual('foo');
+                      });
+
+                      somePromise = getPromise().then((data) => {
+                        expect(data).toEqual('foo');
+                      });
+
+                      await somePromise;
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('promise test', async function () {
+                      let somePromise = getPromise().then((data) => {
+                        expect(data).toEqual('foo');
+                      });
+
+                      ({ somePromise } = {})
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('promise test', async function () {
+                      let somePromise = getPromise().then((data) => {
+                        expect(data).toEqual('foo');
+                      });
+
+                      {
+                        somePromise = getPromise().then((data) => {
+                          expect(data).toEqual('foo');
+                        });
+
+                        await somePromise;
+                      }
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('that we error on this destructuring', async () => {
+                      [promise] = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    test('that we error on this', () => {
+                      const promise = something().then(value => {
+                        expect(value).toBe('red');
+                      });
+
+                      log(promise);
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('is valid', async () => {
+                      const promise = loadNumber().then(number => {
+                        expect(typeof number).toBe('number');
+
+                        return number + 1;
+                      });
+
+                      expect(promise).toBeInstanceOf(Promise);
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    it('is valid', async () => {
+                      const promise = loadNumber().then(number => {
+                        expect(typeof number).toBe('number');
+
+                        return number + 1;
+                      });
+
+                      expect(anotherPromise).resolves.toBe(1);
+                    });
+                  ",
+            None,
+            None,
+        ),
+        (
+            "
+                    import { it as promiseThatThis } from 'vitest';
+
+                    promiseThatThis('is valid', async () => {
+                      const promise = loadNumber().then(number => {
+                        expect(typeof number).toBe('number');
+
+                        return number + 1;
+                      });
+
+                      expect(anotherPromise).resolves.toBe(1);
+                    });
+                  ",
+            None,
+            None,
+        ), // { "parserOptions": { "sourceType": "module" } },
+           /*
+           (
+               "
+                    promiseThatThis('is valid', async () => {
+                      const promise = loadNumber().then(number => {
+                        expect(typeof number).toBe('number');
+
+                        return number + 1;
+                      });
+
+                      expect(anotherPromise).resolves.toBe(1);
+                    });
+                  ",
+               None,
+               Some(
+                   serde_json::json!({ "settings": { "vitest": { "globalAliases": { "xit": ["promiseThatThis"] } } } }),
+               ),
+           ),
+            */
+    ];
+
+    fail.extend(vitest_fail);
+
     Tester::new(ValidExpectInPromise::NAME, ValidExpectInPromise::PLUGIN, pass, fail)
         .with_jest_plugin(true)
+        .with_vitest_plugin(true)
         .test_and_snapshot();
 }
