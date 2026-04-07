@@ -14,8 +14,13 @@ pub struct MessageRule {
 }
 
 impl MessageRule {
-    /// Returns the canonical name of the rule in the format `{plugin}/{rule}`.
-    pub fn canonical_name(&self) -> String {
+    /// Returns the canonical name of the rule in the format `{plugin}/{rule}`. Omits
+    /// the plugin name for core rules (like `no-undef` instead of `eslint/no-undef`).
+    pub fn short_canonical_name(&self) -> String {
+        if self.plugin_name == "eslint" {
+            return self.rule_name.to_string();
+        }
+
         format!("{}/{}", self.plugin_name, self.rule_name)
     }
 }

@@ -97,8 +97,10 @@ impl DiffManager {
             let mut suppression_tracking: FxHashMap<String, DiagnosticCounts> =
                 FxHashMap::default();
             for message in diagnostics {
-                let Some(key) =
-                    message.rule.as_ref().map(super::super::fixer::MessageRule::canonical_name)
+                let Some(key) = message
+                    .rule
+                    .as_ref()
+                    .map(super::super::fixer::MessageRule::short_canonical_name)
                 else {
                     continue;
                 };
@@ -129,7 +131,7 @@ impl DiffManager {
                         let Some(key) = message
                             .rule
                             .as_ref()
-                            .map(super::super::fixer::MessageRule::canonical_name)
+                            .map(super::super::fixer::MessageRule::short_canonical_name)
                         else {
                             return true;
                         };
