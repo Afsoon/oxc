@@ -78,9 +78,11 @@ working directory: fixtures/suppression/file_not_detected_report_all_errors
    ,-[folder_b/test.ts:5:3]
  4 | async function none() {
  5 |   await 12;
-   :   ^^^^^
+   :   ^^^^^ ^|
+   :     |    `-- This expression is not Promise-like
  6 | }
    `----
+  help: Remove `await` if the value is synchronous, or change the expression to return a Promise or Thenable before awaiting it.
 
   ! eslint(no-unused-vars): Variable 'a' is declared but never used. Unused variables should start with a '_'.
    ,-[folder_b/test.ts:8:7]
