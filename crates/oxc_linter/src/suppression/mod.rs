@@ -185,6 +185,11 @@ impl SuppressionManager {
         let mut result: FxHashMap<Filename, FileSuppressionsMap> = static_map.as_ref().clone();
 
         for (filename, runtime_rules) in runtime_map {
+            if runtime_rules.is_empty() {
+                // File was seen but had no diagnostics — don't create a new entry for it,
+                // but keep any existing static entry.
+                continue;
+            }
             // For seen files, merge: keep static rules not in runtime, overwrite with runtime counts
             let entry = result.entry(filename.clone()).or_default();
             // Overwrite all runtime rule counts

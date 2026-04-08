@@ -1719,6 +1719,15 @@ mod suppression {
     }
 
     #[test]
+    fn test_no_diagnostics_with_suppress_all() {
+        SuppressionTester::new()
+            .with_cwd("no_diagnostics_with_suppress_all")
+            .with_setup_file(false)
+            .with_expected_file(true)
+            .test(&["--suppress-all"]);
+    }
+
+    #[test]
     fn test_pruning_without_file_does_not_create_one() {
         // This diverges from ESLint now, but probably not a big deal either way
         SuppressionTester::new()
