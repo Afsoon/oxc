@@ -155,7 +155,8 @@ impl<'a> SuppressionFile<'a> {
             return Self { state: SuppressionFileState::Ignored, suppression_data: None };
         }
 
-        if !file_exists && suppress_all {
+        if suppress_all {
+            // All errors will be suppressed and written to the file.
             return Self { state: SuppressionFileState::New, suppression_data: None };
         }
 

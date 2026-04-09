@@ -1673,6 +1673,33 @@ mod suppression {
     }
 
     #[test]
+    fn test_suppress_all_hides_errors_with_existing_file() {
+        // When --suppress-all is used on an existing suppressions file,
+        // error diagnostics should be suppressed, matching ESLint behavior.
+        let args = &["--suppress-all", "--type-aware", "--type-check"];
+        let (stdout, result) = Tester::new()
+            .with_cwd("fixtures/suppression/diagnostics_filtered_if_count_is_the_same".into())
+            .test_output(args);
+        assert!(
+            matches!(result, CliRunResult::LintSucceeded),
+            "Expected LintSucceeded with --suppress-all, got {result:?}"
+        );
+        // Only TS type-check errors and warnings should remain.
+        assert!(
+            !stdout.contains("eslint(no-console)"),
+            "no-console error should be suppressed with --suppress-all.\nOutput: {stdout}"
+        );
+        assert!(
+            !stdout.contains("typescript-eslint(await-thenable)"),
+            "await-thenable error should be suppressed with --suppress-all.\nOutput: {stdout}"
+        );
+        assert!(
+            !stdout.contains("typescript-eslint(array-type)"),
+            "array-type error should be suppressed with --suppress-all.\nOutput: {stdout}"
+        );
+    }
+
+    #[test]
     fn test_only_file_diffs_are_reported() {
         let args = &[];
         Tester::new()

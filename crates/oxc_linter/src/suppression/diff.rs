@@ -122,7 +122,14 @@ impl DiffManager {
             SuppressionFileState::New => {
                 let runtime_suppression_tracking = build_suppression_map(&lint_diagnostics);
 
-                (lint_diagnostics, Some(runtime_suppression_tracking))
+                // Filter out error-severity diagnostics — they are being written
+                // to the new suppressions file. Only warnings pass through.
+                let filtered = lint_diagnostics
+                    .into_iter()
+                    .filter(|message| message.error.severity != Severity::Error)
+                    .collect();
+
+                (filtered, Some(runtime_suppression_tracking))
             }
             SuppressionFileState::Exists => {
                 let runtime_suppression_tracking = build_suppression_map(&lint_diagnostics);
