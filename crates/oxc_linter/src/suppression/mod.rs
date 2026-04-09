@@ -284,8 +284,10 @@ impl SuppressionManager {
         }
 
         if !has_new {
-            for filename in runtime_map.keys() {
-                if !static_map.contains_key(filename) {
+            for (filename, runtime_rules) in runtime_map {
+                // Skip files with no error-level violations, because they only had warnings,
+                // which are not tracked in suppressions.
+                if !runtime_rules.is_empty() && !static_map.contains_key(filename) {
                     has_new = true;
                     break;
                 }

@@ -1697,6 +1697,26 @@ mod suppression {
     }
 
     #[test]
+    fn test_no_false_positive_after_suppress_all() {
+        // After --suppress-all creates a suppressions file with only error-level rules,
+        // a re-run without --suppress-all should NOT report "new violations not covered"
+        // just because some files have only warning-level violations.
+        // This matches ESLint behavior: a clean re-run after suppression is silent with exit 0.
+        let args = &[];
+        let (stdout, result) = Tester::new()
+            .with_cwd("fixtures/suppression/no_false_positive_after_suppress_all".into())
+            .test_output(args);
+        assert!(
+            !stdout.contains("new violations not covered"),
+            "False positive: warnings-only files should not be reported as new violations.\nOutput: {stdout}"
+        );
+        assert!(
+            !matches!(result, CliRunResult::LintFoundErrors),
+            "Expected no errors (warnings-only files should not count), got {result:?}"
+        );
+    }
+
+    #[test]
     fn test_prune_errors_warning() {
         let args = &["--type-aware", "--type-check"];
         Tester::new()
