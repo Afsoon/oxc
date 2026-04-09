@@ -13,9 +13,9 @@ use ignore::{gitignore::Gitignore, overrides::OverrideBuilder};
 
 use oxc_diagnostics::{DiagnosticSender, DiagnosticService, GraphicalReportHandler, OxcDiagnostic};
 use oxc_linter::{
-    AllowWarnDeny, ConfigStore, ConfigStoreBuilder, ExternalLinter, ExternalPluginStore,
-    InvalidFilterKind, LintFilter, LintOptions, LintRunner, LintServiceOptions, Linter,
-    OxlintSuppressionFileAction, SuppressionManager,
+    AllowWarnDeny, ConfigBuilderError, ConfigStore, ConfigStoreBuilder, ExternalLinter,
+    ExternalPluginStore, InvalidFilterKind, LintFilter, LintOptions, LintRunner,
+    LintServiceOptions, Linter, OxlintSuppressionFileAction, SuppressionManager,
 };
 
 #[cfg(feature = "napi")]
@@ -588,6 +588,7 @@ impl CliRunner {
             number_of_rules,
             threads_count: rayon::current_num_threads(),
             start_time: now.elapsed(),
+            oxlint_suppression_file_action: OxlintSuppressionFileAction::None,
         }) {
             print_and_flush_stdout(stdout, &end);
         }
