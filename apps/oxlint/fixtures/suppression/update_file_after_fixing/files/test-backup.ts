@@ -1,5 +1,5 @@
 console.log();
-const foo: number = "42";
+let foo: number = "42";
 
 async function none() {
   await 12;

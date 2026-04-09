@@ -1715,7 +1715,7 @@ mod suppression {
             .test_output(args);
 
         // The error comes from the type check error. Type check errors aren't filtered
-        assert!(stdout.contains("Found 0 warnings and 2 errors."), "Unexpected errors found");
+        assert!(stdout.contains("Found 3 warnings and 2 errors."), "Unexpected errors found");
     }
 
     #[test]

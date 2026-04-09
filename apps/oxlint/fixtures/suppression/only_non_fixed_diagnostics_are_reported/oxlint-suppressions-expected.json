@@ -3,9 +3,6 @@
     "no-console": {
       "count": 1
     },
-    "no-unused-vars": {
-      "count": 4
-    },
     "typescript/await-thenable": {
       "count": 1
     }

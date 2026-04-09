@@ -988,7 +988,7 @@ struct DiagnosticHandler {
     error_sender: DiagnosticSender,
     /// Messages requiring fixes, grouped by file path: messages.
     messages_requiring_fixes: FxHashMap<PathBuf, Vec<Message>>,
-    messages_not_requiring_fixes: FxHashMap<PathBuf, Vec<TsGoLintRuleDiagnostic>>,
+    messages_not_requiring_fixes: FxHashMap<PathBuf, Vec<(TsGoLintRuleDiagnostic, AllowWarnDeny)>>,
 }
 
 impl DiagnosticHandler {
@@ -1036,7 +1036,7 @@ impl DiagnosticHandler {
         } else if !ignore_suppression {
             let entry = self.messages_not_requiring_fixes.entry(path).or_default();
 
-            entry.push(diagnostic);
+            entry.push((diagnostic, severity));
         } else {
             self.send_diagnostic(&path, diagnostic.into(), severity);
         }
@@ -1108,11 +1108,17 @@ impl DiagnosticHandler {
                             messages
                                 .iter()
                                 .cloned()
-                                .map(|diagnostic| {
-                                    Message::from_tsgo_lint_diagnostic(
+                                .map(|(diagnostic, severity)| {
+                                    let mut message = Message::from_tsgo_lint_diagnostic(
                                         diagnostic,
                                         source_text.as_str(),
-                                    )
+                                    );
+                                    message.error.severity = if severity == AllowWarnDeny::Deny {
+                                        Severity::Error
+                                    } else {
+                                        Severity::Warning
+                                    };
+                                    message
                                 })
                                 .collect(),
                         )
