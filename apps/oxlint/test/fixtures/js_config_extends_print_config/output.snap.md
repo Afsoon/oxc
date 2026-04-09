@@ -1,9 +1,9 @@
 # Exit code
-0
+1
 
 # stdout
 ```
-Found 0 warnings and 0 errors.
+No files found to lint. Please check your paths and ignore patterns.
 Finished in Xms on 0 files with 93 rules using X threads.
 ```
 

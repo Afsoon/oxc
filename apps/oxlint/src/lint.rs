@@ -158,16 +158,6 @@ impl CliRunner {
             // If explicit paths were provided, but all have been
             // filtered, return early.
             if provided_path_count > 0 {
-                if let Some(end) = output_formatter.lint_command_info(&LintCommandInfo {
-                    number_of_files: 0,
-                    number_of_rules: None,
-                    threads_count: rayon::current_num_threads(),
-                    start_time: now.elapsed(),
-                    oxlint_suppression_file_action: OxlintSuppressionFileAction::None,
-                }) {
-                    print_and_flush_stdout(stdout, &end);
-                }
-
                 return Self::handle_no_files_found(
                     stdout,
                     &output_formatter,
