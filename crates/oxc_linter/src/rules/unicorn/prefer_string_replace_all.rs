@@ -7,7 +7,8 @@ use oxc_codegen::CodegenOptions;
 use oxc_diagnostics::OxcDiagnostic;
 use oxc_macros::declare_oxc_lint;
 use oxc_regular_expression::ast::Term;
-use oxc_span::{CompactStr, GetSpan, SPAN, Span};
+use oxc_span::{GetSpan, SPAN, Span};
+use oxc_str::CompactStr;
 
 use crate::{AstNode, ast_util::extract_regex_flags, context::LintContext, rule::Rule};
 
