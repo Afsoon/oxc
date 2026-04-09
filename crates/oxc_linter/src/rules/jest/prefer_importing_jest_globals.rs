@@ -1,12 +1,7 @@
-use std::borrow::Cow;
-
 use itertools::Itertools;
 use oxc_ast::{
     AstKind,
-    ast::{
-        Argument, BindingPattern, Expression, ImportDeclarationSpecifier,
-        ImportOrExportKind, Statement,
-    },
+    ast::{Argument, BindingPattern, Expression},
 };
 use oxc_diagnostics::OxcDiagnostic;
 use oxc_macros::declare_oxc_lint;
@@ -17,11 +12,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     context::LintContext,
-    fixer::RuleFixer,
-    rule::Rule,
+    fixer::{RuleFix, RuleFixer},
+    module_record::ImportImportName,
+    rule::{DefaultRuleConfig, Rule},
     utils::{
-        JestFnKind, JestGeneralFnKind, ParsedJestFnCallNew, PossibleJestNode,
-        collect_possible_jest_call_node, parse_jest_fn_call,
+        JestFnKind, JestGeneralFnKind, ParsedJestFnCallNew, collect_possible_jest_call_node,
+        parse_jest_fn_call,
     },
 };
 
@@ -32,14 +28,8 @@ fn prefer_importing_jest_globals_diagnostic(span: Span, globals: &str) -> OxcDia
     .with_label(span)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct PreferImportingJestGlobals(Box<PreferImportingJestGlobalsConfig>);
-
-impl Default for PreferImportingJestGlobals {
-    fn default() -> Self {
-        Self(Box::new(PreferImportingJestGlobalsConfig::default()))
-    }
-}
 
 impl std::ops::Deref for PreferImportingJestGlobals {
     type Target = PreferImportingJestGlobalsConfig;
@@ -83,15 +73,18 @@ enum JestFnType {
 
 impl JestFnType {
     fn matches(self, kind: JestFnKind) -> bool {
-        match (self, kind) {
-            (Self::Hook, JestFnKind::General(JestGeneralFnKind::Hook)) => true,
-            (Self::Describe, JestFnKind::General(JestGeneralFnKind::Describe)) => true,
-            (Self::Test, JestFnKind::General(JestGeneralFnKind::Test)) => true,
-            (Self::Expect, JestFnKind::Expect | JestFnKind::ExpectTypeOf) => true,
-            (Self::Jest, JestFnKind::General(JestGeneralFnKind::Jest | JestGeneralFnKind::Vitest)) => true,
-            (Self::Unknown, JestFnKind::Unknown) => true,
-            _ => false,
-        }
+        matches!(
+            (self, kind),
+            (Self::Hook, JestFnKind::General(JestGeneralFnKind::Hook))
+                | (Self::Describe, JestFnKind::General(JestGeneralFnKind::Describe))
+                | (Self::Test, JestFnKind::General(JestGeneralFnKind::Test))
+                | (Self::Expect, JestFnKind::Expect | JestFnKind::ExpectTypeOf)
+                | (
+                    Self::Jest,
+                    JestFnKind::General(JestGeneralFnKind::Jest | JestGeneralFnKind::Vitest)
+                )
+                | (Self::Unknown, JestFnKind::Unknown)
+        )
     }
 }
 
@@ -135,27 +128,19 @@ declare_oxc_lint!(
 
 impl Rule for PreferImportingJestGlobals {
     fn from_configuration(value: serde_json::Value) -> Result<Self, serde_json::error::Error> {
-        if value.is_null() {
-            return Ok(Self::default());
-        }
-        let config: PreferImportingJestGlobalsConfig =
-            serde_json::from_value(value.get(0).unwrap_or(&value).clone()).unwrap_or_default();
-        Ok(Self(Box::new(config)))
+        serde_json::from_value::<DefaultRuleConfig<Self>>(value).map(DefaultRuleConfig::into_inner)
     }
 
     fn run_once(&self, ctx: &LintContext) {
-        let possible_jest_nodes = collect_possible_jest_call_node(ctx);
-        let mut functions_to_import: FxHashSet<Cow<str>> = FxHashSet::default();
+        let mut functions_to_import: FxHashSet<String> = FxHashSet::default();
         let mut reporting_span: Option<Span> = None;
 
-        for jest_node in &possible_jest_nodes {
-            // Only care about globals (not already imported from @jest/globals)
+        for jest_node in &collect_possible_jest_call_node(ctx) {
             if jest_node.original.is_some() {
                 continue;
             }
 
-            let node = jest_node.node;
-            let AstKind::CallExpression(call_expr) = node.kind() else {
+            let AstKind::CallExpression(call_expr) = jest_node.node.kind() else {
                 continue;
             };
 
@@ -163,79 +148,63 @@ impl Rule for PreferImportingJestGlobals {
                 continue;
             };
 
-            let kind = jest_fn_call.kind();
-            if !self.types.iter().any(|t| t.matches(kind)) {
+            if !self.types.iter().any(|t| t.matches(jest_fn_call.kind())) {
                 continue;
             }
 
-            // Get the function name (e.g. "describe", "test", "expect")
             let name = match &jest_fn_call {
-                ParsedJestFnCallNew::GeneralJest(call) => call.name.clone(),
-                ParsedJestFnCallNew::Expect(call)
-                | ParsedJestFnCallNew::ExpectTypeOf(call) => call.name.clone(),
+                ParsedJestFnCallNew::GeneralJest(c) => c.name.to_string(),
+                ParsedJestFnCallNew::Expect(c) | ParsedJestFnCallNew::ExpectTypeOf(c) => {
+                    c.name.to_string()
+                }
             };
             functions_to_import.insert(name);
-
-            if reporting_span.is_none() {
-                reporting_span = Some(call_expr.callee.span());
-            }
-        }
-
-        if functions_to_import.is_empty() {
-            return;
+            reporting_span.get_or_insert(call_expr.callee.span());
         }
 
         let Some(span) = reporting_span else { return };
-        let globals_list = functions_to_import.iter().sorted().join(", ");
 
         ctx.diagnostic_with_fix(
-            prefer_importing_jest_globals_diagnostic(span, &globals_list),
-            |fixer| {
-                build_fix(ctx, &fixer, &mut functions_to_import)
-            },
+            prefer_importing_jest_globals_diagnostic(
+                span,
+                &functions_to_import.iter().sorted().join(", "),
+            ),
+            |fixer| build_fix(ctx, &fixer, &mut functions_to_import),
         );
     }
 }
 
-/// Build the fix: merge with existing imports/requires or create new ones.
 fn build_fix<'a>(
     ctx: &LintContext<'a>,
     fixer: &RuleFixer<'_, 'a>,
-    functions_to_import: &mut FxHashSet<Cow<str>>,
-) -> crate::fixer::RuleFix {
+    functions_to_import: &mut FxHashSet<String>,
+) -> RuleFix {
     let program = ctx.nodes().program();
+    let is_module = ctx.source_type().is_module();
 
-    // 1. Try to merge with existing `import ... from '@jest/globals'` (always ESM)
+    // 1. Merge with existing `import ... from '@jest/globals'`
     if let Some(fix) = try_merge_esm_import(ctx, fixer, functions_to_import) {
         return fix;
     }
 
-    // 2. Try to merge with existing `const { ... } = require('@jest/globals')` (always CJS)
+    // 2. Merge with existing `const { ... } = require('@jest/globals')`
     if let Some(fix) = try_merge_cjs_require(ctx, fixer, functions_to_import) {
         return fix;
     }
 
-    // 3. No existing @jest/globals import/require — create a new one.
-    // Use `sourceType` from parser options to determine ESM vs CJS,
-    // matching the OG rule's behavior.
-    let is_module = ctx.source_type().is_module();
-    let import_text = create_import_statement(is_module, functions_to_import);
+    // 3. Create a new import/require
+    let text = create_import_text(is_module, functions_to_import);
 
-    // Insert after "use strict" directive if present
-    if let Some(last_directive) = program.directives.last() {
-        return fixer.insert_text_after_range(last_directive.span, format!("\n{import_text}"));
+    if let Some(directive) = program.directives.last() {
+        return fixer.insert_text_after_range(directive.span, format!("\n{text}"));
     }
-
-    // Insert after hashbang if present
     if let Some(hashbang) = &program.hashbang {
-        return fixer.insert_text_after_range(hashbang.span, format!("\n{import_text}"));
+        return fixer.insert_text_after_range(hashbang.span, format!("\n{text}"));
     }
-
-    // Insert at the top of the file
-    fixer.insert_text_before_range(Span::empty(0), format!("{import_text}\n"))
+    fixer.insert_text_before_range(Span::empty(0), format!("{text}\n"))
 }
 
-fn create_import_statement(is_module: bool, functions: &FxHashSet<Cow<str>>) -> String {
+fn create_import_text(is_module: bool, functions: &FxHashSet<String>) -> String {
     let sorted = functions.iter().sorted().join(", ");
     if is_module {
         format!("import {{ {sorted} }} from '{IMPORT_SOURCE}';")
@@ -244,121 +213,110 @@ fn create_import_statement(is_module: bool, functions: &FxHashSet<Cow<str>>) -> 
     }
 }
 
-/// Try to find and replace an existing `import ... from '@jest/globals'`.
-/// Merges existing specifiers with the new functions, then replaces the entire import.
+/// Merge with existing `import ... from '@jest/globals'` and replace it entirely.
+/// Uses `module_record` to find import entries and their statement span.
 fn try_merge_esm_import<'a>(
     ctx: &LintContext<'a>,
     fixer: &RuleFixer<'_, 'a>,
-    functions_to_import: &mut FxHashSet<Cow<str>>,
-) -> Option<crate::fixer::RuleFix> {
-    let is_module = true; // We found an ESM import, so output ESM
-    let program = ctx.nodes().program();
+    functions_to_import: &mut FxHashSet<String>,
+) -> Option<RuleFix> {
+    let module_record = ctx.module_record();
 
-    let import_decl = program.body.iter().find_map(|stmt| {
-        if let Statement::ImportDeclaration(decl) = stmt {
-            if decl.source.value == IMPORT_SOURCE
-                && decl.import_kind == ImportOrExportKind::Value
-            {
-                return Some(decl);
-            }
+    // Find the first `@jest/globals` import statement span
+    let first_span = module_record
+        .import_entries
+        .iter()
+        .find(|e| e.module_request.name() == IMPORT_SOURCE && !e.is_type)?
+        .statement_span;
+
+    // Merge only entries belonging to that same import statement
+    for entry in &module_record.import_entries {
+        if entry.statement_span != first_span || entry.is_type {
+            continue;
         }
-        None
-    })?;
 
-    // Merge existing specifiers into the set
-    for specifier in import_decl.specifiers.iter().flatten() {
-        match specifier {
-            ImportDeclarationSpecifier::ImportSpecifier(spec) => {
-                let imported = match &spec.imported {
-                    oxc_ast::ast::ModuleExportName::IdentifierName(id) => {
-                        id.name.as_str().to_string()
-                    }
-                    oxc_ast::ast::ModuleExportName::IdentifierReference(id) => {
-                        id.name.as_str().to_string()
-                    }
-                    oxc_ast::ast::ModuleExportName::StringLiteral(lit) => {
-                        format!("'{}'", lit.value)
-                    }
-                };
-                let local = spec.local.name.as_str();
-                if local != imported {
-                    functions_to_import.insert(Cow::Owned(format!("{imported} as {local}")));
+        match &entry.import_name {
+            ImportImportName::Name(name_span) => {
+                let imported = ctx.source_range(name_span.span);
+                let local = entry.local_name.name.as_str();
+                if imported == local {
+                    functions_to_import.insert(local.to_string());
                 } else {
-                    functions_to_import.insert(Cow::Owned(imported));
+                    functions_to_import.insert(format!("{imported} as {local}"));
                 }
             }
-            ImportDeclarationSpecifier::ImportDefaultSpecifier(spec) => {
-                functions_to_import.insert(Cow::Owned(spec.local.name.to_string()));
+            ImportImportName::Default(_) => {
+                functions_to_import.insert(entry.local_name.name.to_string());
             }
-            ImportDeclarationSpecifier::ImportNamespaceSpecifier(_) => {}
+            ImportImportName::NamespaceObject => {}
         }
     }
 
-    let replacement = create_import_statement(is_module, functions_to_import);
-    Some(fixer.replace(import_decl.span, replacement))
+    Some(fixer.replace(first_span, create_import_text(true, functions_to_import)))
 }
 
-/// Try to find and replace an existing `const { ... } = require('@jest/globals')`.
-/// Merges existing destructured names with the new functions, then replaces entirely.
+/// Merge with existing `const { ... } = require('@jest/globals')` and replace it entirely.
+/// Uses semantic analysis to find `require` references instead of iterating the AST.
 fn try_merge_cjs_require<'a>(
     ctx: &LintContext<'a>,
     fixer: &RuleFixer<'_, 'a>,
-    functions_to_import: &mut FxHashSet<Cow<str>>,
-) -> Option<crate::fixer::RuleFix> {
-    let program = ctx.nodes().program();
+    functions_to_import: &mut FxHashSet<String>,
+) -> Option<RuleFix> {
     let is_module = ctx.source_type().is_module();
+    let alias_sep = if is_module { " as " } else { ": " };
 
-    // Find `const { ... } = require('@jest/globals')` in the program body
-    for stmt in &program.body {
-        let Statement::VariableDeclaration(var_decl) = stmt else { continue };
-        for declarator in &var_decl.declarations {
-            let Some(Expression::CallExpression(call)) = &declarator.init else { continue };
+    let require_refs = ctx.scoping().root_unresolved_references().get("require")?;
 
-            // Check if it's `require('@jest/globals')`
-            let is_jest_require = matches!(&call.callee, Expression::Identifier(id) if id.name == "require")
-                && call.arguments.len() == 1
-                && is_string_arg_matching(&call.arguments[0], IMPORT_SOURCE);
+    for &ref_id in require_refs {
+        let reference = ctx.scoping().get_reference(ref_id);
+        let call_node = ctx.nodes().parent_node(reference.node_id());
+        let AstKind::CallExpression(call) = call_node.kind() else { continue };
 
-            if !is_jest_require {
-                continue;
-            }
+        let is_jest_require =
+            call.arguments.len() == 1 && is_string_arg_matching(&call.arguments[0], IMPORT_SOURCE);
 
-            // Merge existing destructured properties.
-            // Extract the local binding name from each property.
-            // Aliases like `'describe': describe` or `describe: context` are
-            // preserved as `describe as context` for ESM or `describe: context` for CJS.
-            if let BindingPattern::ObjectPattern(pattern) = &declarator.id {
-                for prop in &pattern.properties {
-                    // Skip computed properties (e.g. `[() => {}]: it`)
-                    if prop.computed {
-                        continue;
-                    }
+        if !is_jest_require {
+            continue;
+        }
 
-                    let Some(key_name) = prop.key.static_name() else {
-                        continue;
-                    };
+        // Walk up to the VariableDeclarator and VariableDeclaration
+        let Some(var_declarator_node) = ctx
+            .nodes()
+            .ancestors(call_node.id())
+            .find(|n| matches!(n.kind(), AstKind::VariableDeclarator(_)))
+        else {
+            continue;
+        };
+        let AstKind::VariableDeclarator(declarator) = var_declarator_node.kind() else {
+            continue;
+        };
 
-                    // Skip non-identifier values (e.g. `describe: []`)
-                    let BindingPattern::BindingIdentifier(value_ident) = &prop.value else {
-                        continue;
-                    };
-                    let value_name = value_ident.name.as_str();
+        // Merge existing destructured properties
+        if let BindingPattern::ObjectPattern(pattern) = &declarator.id {
+            for prop in &pattern.properties {
+                if prop.computed {
+                    continue;
+                }
+                let Some(key_name) = prop.key.static_name() else { continue };
+                let BindingPattern::BindingIdentifier(value_ident) = &prop.value else {
+                    continue;
+                };
+                let value_name = value_ident.name.as_str();
 
-                    if key_name == value_name {
-                        functions_to_import.insert(Cow::Owned(key_name.to_string()));
-                    } else if is_module {
-                        functions_to_import
-                            .insert(Cow::Owned(format!("{key_name} as {value_name}")));
-                    } else {
-                        functions_to_import
-                            .insert(Cow::Owned(format!("{key_name}: {value_name}")));
-                    }
+                if key_name == value_name {
+                    functions_to_import.insert(key_name.to_string());
+                } else {
+                    functions_to_import.insert(format!("{key_name}{alias_sep}{value_name}"));
                 }
             }
-
-            let replacement = create_import_statement(is_module, functions_to_import);
-            return Some(fixer.replace(var_decl.span, replacement));
         }
+
+        // VariableDeclaration is the direct parent of VariableDeclarator
+        let var_decl_node = ctx.nodes().parent_node(var_declarator_node.id());
+
+        return Some(
+            fixer.replace(var_decl_node.span(), create_import_text(is_module, functions_to_import)),
+        );
     }
 
     None
@@ -375,7 +333,6 @@ fn is_string_arg_matching(arg: &Argument, value: &str) -> bool {
         _ => false,
     })
 }
-
 
 #[test]
 fn test() {
