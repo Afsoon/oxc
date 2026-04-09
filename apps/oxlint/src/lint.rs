@@ -458,6 +458,7 @@ impl CliRunner {
         }
 
         let result = suppression_manager.finalize(diff_manager, &tx_error, &cwd);
+        let suppress_all_succeeded = suppression_options.suppress_all && result.is_ok();
 
         drop(tx_error);
 
@@ -469,6 +470,11 @@ impl CliRunner {
             suppression_manager.file_action
         };
 
+        let has_unpruned_suppressions = matches!(
+            oxlint_suppression_file_action,
+            OxlintSuppressionFileAction::HasUnprunedSuppressions
+        );
+
         if let Some(end) = output_formatter.lint_command_info(&LintCommandInfo {
             number_of_files,
             number_of_rules,
@@ -477,6 +483,16 @@ impl CliRunner {
             oxlint_suppression_file_action,
         }) {
             print_and_flush_stdout(stdout, &end);
+        }
+
+        // When --suppress-all is used and the file was written successfully,
+        // exit with success (matching ESLint behavior: suppressing is a success action).
+        if suppress_all_succeeded {
+            return CliRunResult::LintSucceeded;
+        }
+
+        if has_unpruned_suppressions {
+            return CliRunResult::LintUnprunedSuppressions;
         }
 
         if diagnostic_result.errors_count() > 0 {
@@ -1289,7 +1305,7 @@ mod test {
     #[test]
     fn test_rules_json_output() {
         let args = &["--rules", "-f=json"];
-        let stdout = Tester::new().with_cwd("fixtures".into()).test_output(args);
+        let (stdout, _) = Tester::new().with_cwd("fixtures".into()).test_output(args);
 
         // Parse output as JSON array. If parsing fails, the test will fail.
         let rules: Vec<serde_json::Value> =
@@ -1635,7 +1651,10 @@ export { redundant };
 #[cfg(test)]
 mod suppression {
 
-    use crate::tester::{SuppressionTester, Tester};
+    use crate::{
+        cli::CliRunResult,
+        tester::{SuppressionTester, Tester},
+    };
 
     #[test]
     fn file_not_detected_report_all_errors() {
@@ -1686,6 +1705,19 @@ mod suppression {
     }
 
     #[test]
+    fn test_unpruned_suppressions_exit_code() {
+        // When there are stale suppressions, exit code should be 2
+        let args = &["--type-aware", "--type-check"];
+        let (_stdout, result) = Tester::new()
+            .with_cwd("fixtures/suppression/fixed_violations_are_reported".into())
+            .test_output(args);
+        assert!(
+            matches!(result, CliRunResult::LintUnprunedSuppressions),
+            "Expected LintUnprunedSuppressions (exit code 2), got {result:?}"
+        );
+    }
+
+    #[test]
     fn test_report_one_new_error_but_filter_the_rest() {
         let args = &["--type-aware", "--type-check"];
         Tester::new()
@@ -1710,9 +1742,15 @@ mod suppression {
             .with_expected_file(true);
 
         suppression.test(args);
-        let stdout = Tester::new()
+
+        let (stdout, result) = Tester::new()
             .with_cwd("fixtures/suppression/project_without_suppression_detected".into())
             .test_output(args);
+        // --suppress-all should exit with success (matching ESLint behavior)
+        assert!(
+            matches!(result, CliRunResult::LintSucceeded),
+            "Expected LintSucceeded, got {result:?}"
+        );
 
         // The error comes from the type check error. Type check errors aren't filtered
         assert!(stdout.contains("Found 3 warnings and 2 errors."), "Unexpected errors found");

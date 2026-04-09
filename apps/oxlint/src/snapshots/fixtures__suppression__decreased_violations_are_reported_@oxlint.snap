@@ -12,5 +12,5 @@ working directory: fixtures/suppression/decreased_violations_are_reported
 Found 0 warnings and 1 error.
 Finished in <variable>ms on 1 file with 56 rules using 1 threads.
 ----------
-CLI result: LintFoundErrors
+CLI result: LintUnprunedSuppressions
 ----------

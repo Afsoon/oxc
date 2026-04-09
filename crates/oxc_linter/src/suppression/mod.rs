@@ -53,6 +53,7 @@ pub enum OxlintSuppressionFileAction {
     Updated,
     Exists,
     Created,
+    HasUnprunedSuppressions,
     Malformed(OxcDiagnostic),
     UnableToPerformFsOperation(OxcDiagnostic),
 }
@@ -166,11 +167,14 @@ impl SuppressionManager {
             self.write()
         } else {
             // Read-only mode: report diagnostics for any differences
-            let errors = Self::compute_diagnostics(&static_map, &runtime_map);
+            let (errors, has_unused) = Self::compute_diagnostics(&static_map, &runtime_map);
             if !errors.is_empty() {
                 let diagnostics =
                     DiagnosticService::wrap_diagnostics(cwd, Path::new(""), "", errors);
                 tx_error.send(diagnostics).unwrap();
+            }
+            if has_unused {
+                self.file_action = OxlintSuppressionFileAction::HasUnprunedSuppressions;
             }
             Ok(())
         }
@@ -242,7 +246,7 @@ impl SuppressionManager {
     fn compute_diagnostics(
         static_map: &StaticSuppressionMap,
         runtime_map: &FxHashMap<Filename, FileSuppressionsMap>,
-    ) -> Vec<OxcDiagnostic> {
+    ) -> (Vec<OxcDiagnostic>, bool) {
         let mut has_unused = false;
         let mut has_new = false;
 
@@ -306,7 +310,7 @@ impl SuppressionManager {
             );
         }
 
-        errors
+        (errors, has_unused)
     }
 
     fn has_been_updated(&mut self) {

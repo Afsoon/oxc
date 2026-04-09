@@ -4,7 +4,7 @@ use cow_utils::CowUtils;
 use lazy_regex::Regex;
 use serde_json::Value;
 
-use crate::cli::{CliRunner, lint_command};
+use crate::cli::{CliRunResult, CliRunner, lint_command};
 
 pub struct Tester {
     cwd: PathBuf,
@@ -36,15 +36,14 @@ impl Tester {
         let _ = CliRunner::new(options, None).with_cwd(self.cwd.clone()).run(&mut output);
     }
 
-    pub fn test_output(&self, args: &[&str]) -> String {
+    pub fn test_output(&self, args: &[&str]) -> (String, CliRunResult) {
         let mut new_args = vec!["--silent"];
         new_args.extend(args);
 
         let options = lint_command().run_inner(new_args.as_slice()).unwrap();
         let mut output = Vec::new();
-        let _ = CliRunner::new(options, None).with_cwd(self.cwd.clone()).run(&mut output);
-
-        String::from_utf8(output).unwrap()
+        let result = CliRunner::new(options, None).with_cwd(self.cwd.clone()).run(&mut output);
+        (String::from_utf8(output).unwrap(), result)
     }
 
     pub fn test_fix(file: &str, before: &str, after: &str) {

@@ -42,9 +42,9 @@ impl InternalFormatter for DefaultOutputFormatter {
 
         let oxlint_suppression_action_text = match &lint_command_info.oxlint_suppression_file_action
         {
-            OxlintSuppressionFileAction::None | OxlintSuppressionFileAction::Exists => {
-                String::new()
-            }
+            OxlintSuppressionFileAction::None
+            | OxlintSuppressionFileAction::Exists
+            | OxlintSuppressionFileAction::HasUnprunedSuppressions => String::new(),
             OxlintSuppressionFileAction::Created => {
                 "'oxlint-suppressions.json' has been created in the root folder.\n".to_string()
             }

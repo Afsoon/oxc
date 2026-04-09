@@ -55,5 +55,5 @@ working directory: fixtures/suppression/fixed_violations_are_reported
 Found 3 warnings and 3 errors.
 Finished in <variable>ms on 2 files with 83 rules using 1 threads.
 ----------
-CLI result: LintFoundErrors
+CLI result: LintUnprunedSuppressions
 ----------
