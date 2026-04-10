@@ -123,7 +123,8 @@ declare_oxc_lint!(
     PreferImportingJestGlobals,
     jest,
     style,
-    fix
+    fix,
+    config = PreferImportingJestGlobalsConfig
 );
 
 impl Rule for PreferImportingJestGlobals {
