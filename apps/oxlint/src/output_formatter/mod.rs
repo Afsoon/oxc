@@ -72,6 +72,46 @@ pub struct LintCommandInfo {
     pub oxlint_suppression_file_action: OxlintSuppressionFileAction,
 }
 
+impl LintCommandInfo {
+    pub(super) fn format_execution_summary(&self) -> String {
+        let time = Self::get_execution_time(&lint_command_info.start_time);
+        let s = if lint_command_info.number_of_files == 1 { "" } else { "s" };
+
+        let mut finished_text = if let Some(number_of_rules) = lint_command_info.number_of_rules {
+            format!(
+                "Finished in {time} on {} file{s} with {} rules using {} threads.\n",
+                lint_command_info.number_of_files, number_of_rules, lint_command_info.threads_count
+            )
+        } else {
+            format!(
+                "Finished in {time} on {} file{s} using {} threads.\n",
+                lint_command_info.number_of_files, lint_command_info.threads_count
+            )
+        };
+
+        let oxlint_suppression_action_text = match &lint_command_info.oxlint_suppression_file_action
+        {
+            OxlintSuppressionFileAction::None
+            | OxlintSuppressionFileAction::Exists
+            | OxlintSuppressionFileAction::HasUnprunedSuppressions => String::new(),
+            OxlintSuppressionFileAction::Created => {
+                "'oxlint-suppressions.json' has been created in the root folder.\n".to_string()
+            }
+            OxlintSuppressionFileAction::Updated => {
+                "'oxlint-suppressions.json' has been updated.\n".to_string()
+            }
+            OxlintSuppressionFileAction::Malformed(error)
+            | OxlintSuppressionFileAction::UnableToPerformFsOperation(error) => {
+                format!("{}\n", &error.message.to_string())
+            }
+        };
+
+        finished_text.insert_str(0, oxlint_suppression_action_text.as_ref());
+
+        finished_text
+    }
+}
+
 /// An Interface for the different output formats.
 /// The Formatter is then managed by [`OutputFormatter`].
 trait InternalFormatter {
