@@ -73,24 +73,28 @@ pub struct LintCommandInfo {
 }
 
 impl LintCommandInfo {
-    pub(super) fn format_execution_summary(&self) -> String {
-        let time = Self::get_execution_time(&lint_command_info.start_time);
-        let s = if lint_command_info.number_of_files == 1 { "" } else { "s" };
+    fn get_execution_time(start_time: &Duration) -> String {
+        let ms = start_time.as_millis();
+        if ms < 1000 { format!("{ms}ms") } else { format!("{:.1}s", start_time.as_secs_f64()) }
+    }
 
-        let mut finished_text = if let Some(number_of_rules) = lint_command_info.number_of_rules {
+    pub(super) fn format_execution_summary(&self) -> String {
+        let time = Self::get_execution_time(&self.start_time);
+        let s = if self.number_of_files == 1 { "" } else { "s" };
+
+        let mut finished_text = if let Some(number_of_rules) = self.number_of_rules {
             format!(
                 "Finished in {time} on {} file{s} with {} rules using {} threads.\n",
-                lint_command_info.number_of_files, number_of_rules, lint_command_info.threads_count
+                self.number_of_files, number_of_rules, self.threads_count
             )
         } else {
             format!(
                 "Finished in {time} on {} file{s} using {} threads.\n",
-                lint_command_info.number_of_files, lint_command_info.threads_count
+                self.number_of_files, self.threads_count
             )
         };
 
-        let oxlint_suppression_action_text = match &lint_command_info.oxlint_suppression_file_action
-        {
+        let oxlint_suppression_action_text = match &self.oxlint_suppression_file_action {
             OxlintSuppressionFileAction::None
             | OxlintSuppressionFileAction::Exists
             | OxlintSuppressionFileAction::HasUnprunedSuppressions => String::new(),

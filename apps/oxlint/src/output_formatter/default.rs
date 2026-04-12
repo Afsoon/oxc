@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use crate::output_formatter::{InternalFormatter, OxlintSuppressionFileAction};
+use crate::output_formatter::InternalFormatter;
 use oxc_diagnostics::{
     Error, GraphicalReportHandler,
     reporter::{DiagnosticReporter, DiagnosticResult},
