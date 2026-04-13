@@ -48,6 +48,7 @@
     "jest/no-unnecessary-assertion": "Requires type information. Not currently possible to implement in oxlint.",
     "jest/unbound-method": "Requires type information. Not currently possible to implement in oxlint.",
     "jest/no-error-equal": "Requires type information. Not currently possible to implement in oxlint.",
+    "jest/valid-expect-with-promise": "Requires type information. Not currently possible to implement in oxlint.",
     "vitest/unbound-method": "Requires type information. Not currently possible to implement in oxlint.",
     "vitest/prefer-vi-mocked": "Requires type information. Not currently possible to implement in oxlint.",
 
