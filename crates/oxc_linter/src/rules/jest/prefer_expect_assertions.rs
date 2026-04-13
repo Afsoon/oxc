@@ -17,9 +17,37 @@ use crate::{
     rule::{DefaultRuleConfig, Rule},
     utils::{
         JestFnKind, JestGeneralFnKind, PossibleJestNode, collect_possible_jest_call_node,
-        parse_expect_jest_fn_call, parse_general_jest_fn_call,
+        get_node_name, parse_expect_jest_fn_call, parse_general_jest_fn_call,
     },
 };
+
+/// How `expect` is accessed in the test callback.
+enum ExpectSource {
+    /// `expect` from global scope or ESM import — use `parse_expect_jest_fn_call` with span lookup.
+    Global,
+    /// `({ expect }) => {}` — destructured without renaming, still called `expect`.
+    /// Use `parse_expect_jest_fn_call` with a fake `PossibleJestNode`.
+    ExpectArgNonReassigned,
+    /// `({ expect: myExpect }) => {}` — destructured with renaming.
+    /// The `String` holds the local name (e.g. `"myExpect"`).
+    /// Use `get_node_name` to check if it ends with `assertions` or `hasAssertions`.
+    ExpectArgReassigned(String),
+    /// `(ctx) => {}` — single identifier param, `expect` accessed via `ctx.expect`.
+    /// The `String` holds the param name (e.g. `"ctx"`), so expect is `ctx.expect`.
+    /// Use `get_node_name` to check if it ends with `assertions` or `hasAssertions`.
+    VariableArg(String),
+}
+
+impl ExpectSource {
+    /// Returns the prefix to use in suggestions (e.g. `"expect"`, `"myExpect"`, `"ctx.expect"`).
+    fn expect_prefix(&self) -> String {
+        match self {
+            Self::Global | Self::ExpectArgNonReassigned => "expect".to_string(),
+            Self::ExpectArgReassigned(name) => name.clone(),
+            Self::VariableArg(name) => format!("{name}.expect"),
+        }
+    }
+}
 
 fn has_assertions_takes_no_arguments(span: Span) -> OxcDiagnostic {
     OxcDiagnostic::warn("`expect.hasAssertions` expects no arguments.")
@@ -183,9 +211,7 @@ impl PreferExpectAssertions {
             let call_span = scanner.has_assertions_call_span.unwrap();
             let delete_span = Span::new(args_span.start, call_span.end - 1);
             let fixer = RuleFixer::new(FixKind::Suggestion, ctx);
-            let suggestion = fixer
-                .delete_range(delete_span)
-                .with_message("Remove extra arguments");
+            let suggestion = fixer.delete_range(delete_span).with_message("Remove extra arguments");
             ctx.diagnostic_with_suggestions(
                 has_assertions_takes_no_arguments(args_span),
                 [suggestion],
@@ -225,8 +251,10 @@ impl PreferExpectAssertions {
             return;
         };
 
+        let expect_source = detect_expect_source(callback, ctx.frameworks().is_vitest());
+
         // Check if first statement is expect.assertions / expect.hasAssertions
-        if self.check_first_statement(body, span_lookup, ctx) {
+        if self.check_first_statement(body, span_lookup, &expect_source, ctx) {
             return;
         }
 
@@ -257,19 +285,20 @@ impl PreferExpectAssertions {
             }
         }
 
-        // Suggest adding `expect.hasAssertions()` or `expect.assertions()` at
-        // the start of the test body (matching the OG eslint-plugin-jest rule).
+        // Suggest adding `<prefix>.hasAssertions()` or `<prefix>.assertions()` at
+        // the start of the test body. The prefix is the resolved expect name
+        // (e.g. `expect`, `myExpect`, `ctx.expect`).
+        let prefix = expect_source.expect_prefix();
         let insert_pos = Span::new(body.span.start + 1, body.span.start + 1);
         let fixer = RuleFixer::new(FixKind::Suggestion, ctx);
         let suggestions = [
-            ("Add `expect.hasAssertions()`", "expect.hasAssertions();"),
-            ("Add `expect.assertions(<number of assertions>)`", "expect.assertions();"),
-        ]
-        .map(|(msg, text)| {
             fixer
-                .insert_text_before_range(insert_pos, text)
-                .with_message(msg)
-        });
+                .insert_text_before_range(insert_pos, format!("{prefix}.hasAssertions();"))
+                .with_message(format!("Add `{prefix}.hasAssertions()`")),
+            fixer
+                .insert_text_before_range(insert_pos, format!("{prefix}.assertions();"))
+                .with_message(format!("Add `{prefix}.assertions(<number of assertions>)`")),
+        ];
 
         ctx.diagnostic_with_suggestions(have_expect_assertions(call_expr.span), suggestions);
     }
@@ -280,6 +309,7 @@ impl PreferExpectAssertions {
         &self,
         body: &'a FunctionBody<'a>,
         span_lookup: &FxHashMap<Span, &PossibleJestNode<'a, '_>>,
+        expect_source: &ExpectSource,
         ctx: &LintContext<'a>,
     ) -> bool {
         let Some(Statement::ExpressionStatement(first_expr_stmt)) = body.statements.first() else {
@@ -290,81 +320,99 @@ impl PreferExpectAssertions {
             return false;
         };
 
-        // Look up the inner call in collected jest nodes for proper import resolution
-        // Look up the first call by span to get the correct PossibleJestNode
-        let Some(inner_jest_node) = span_lookup.get(&first_call.span) else {
-            return false;
-        };
+        match expect_source {
+            // For reassigned expect or variable arg (e.g. `myExpect.assertions(1)` or
+            // `ctx.expect.assertions(1)`), we can't use parse_expect_jest_fn_call because
+            // the callee name isn't `expect`. Instead, check via get_node_name.
+            ExpectSource::ExpectArgReassigned(_) | ExpectSource::VariableArg(_) => {
+                let name = get_node_name(&first_call.callee);
+                if name.ends_with(".hasAssertions") || name.ends_with("hasAssertions") {
+                    self.check_has_assertions_args(first_call, ctx);
+                    return true;
+                }
+                if name.ends_with(".assertions") || name.ends_with("assertions") {
+                    self.check_assertions_args(first_call, ctx);
+                    return true;
+                }
+                false
+            }
+            // For global or non-reassigned fixture expect, use parse_expect_jest_fn_call
+            ExpectSource::Global | ExpectSource::ExpectArgNonReassigned => {
+                let inner_jest_node =
+                    if matches!(expect_source, ExpectSource::ExpectArgNonReassigned) {
+                        &PossibleJestNode {
+                            node: ctx.nodes().get_node(first_call.node_id()),
+                            original: None,
+                        }
+                    } else {
+                        let Some(n) = span_lookup.get(&first_call.span) else {
+                            return false;
+                        };
+                        *n
+                    };
 
-        let Some(expect_call) = parse_expect_jest_fn_call(first_call, inner_jest_node, ctx) else {
-            return false;
-        };
+                let Some(expect_call) =
+                    parse_expect_jest_fn_call(first_call, inner_jest_node, ctx)
+                else {
+                    return false;
+                };
 
-        // Check for expect.hasAssertions()
-        if expect_call.members.iter().any(|m| m.is_name_equal("hasAssertions")) {
-            if let Some(args) = &expect_call.matcher_arguments {
-                if !args.is_empty() {
-                    if let Some(args_span) = first_call.arguments_span() {
-                        // Delete from first arg start to just before closing `)`,
-                        // accounting for trailing commas.
-                        let delete_span =
-                            Span::new(args_span.start, first_call.span.end - 1);
-                        let fixer = RuleFixer::new(FixKind::Suggestion, ctx);
-                        let suggestion = fixer
-                            .delete_range(delete_span)
-                            .with_message("Remove extra arguments");
-                        ctx.diagnostic_with_suggestions(
-                            has_assertions_takes_no_arguments(args_span),
-                            [suggestion],
-                        );
-                    }
+                if expect_call.members.iter().any(|m| m.is_name_equal("hasAssertions")) {
+                    self.check_has_assertions_args(first_call, ctx);
+                    return true;
+                }
+
+                if expect_call.members.iter().any(|m| m.is_name_equal("assertions")) {
+                    self.check_assertions_args(first_call, ctx);
+                    return true;
+                }
+
+                false
+            }
+        }
+    }
+
+    /// Validate `expect.hasAssertions()` takes no arguments.
+    fn check_has_assertions_args(&self, call: &CallExpression<'_>, ctx: &LintContext<'_>) {
+        if call.arguments.is_empty() {
+            return;
+        }
+        if let Some(args_span) = call.arguments_span() {
+            let delete_span = Span::new(args_span.start, call.span.end - 1);
+            let fixer = RuleFixer::new(FixKind::Suggestion, ctx);
+            let suggestion = fixer.delete_range(delete_span).with_message("Remove extra arguments");
+            ctx.diagnostic_with_suggestions(
+                has_assertions_takes_no_arguments(args_span),
+                [suggestion],
+            );
+        }
+    }
+
+    /// Validate `expect.assertions(n)` takes exactly one numeric argument.
+    fn check_assertions_args(&self, call: &CallExpression<'_>, ctx: &LintContext<'_>) {
+        match call.arguments.len() {
+            0 => {
+                ctx.diagnostic(assertions_requires_one_argument(call.callee.span()));
+            }
+            1 => {
+                let arg = &call.arguments[0];
+                if !matches!(arg, Argument::NumericLiteral(_)) {
+                    ctx.diagnostic(assertions_requires_number_argument(arg.span()));
                 }
             }
-            return true;
-        }
-
-        // Check for expect.assertions(n)
-        if expect_call.members.iter().any(|m| m.is_name_equal("assertions")) {
-            if let Some(args) = &expect_call.matcher_arguments {
-                match args.len() {
-                    0 => {
-                        let matcher_span = expect_call
-                            .members
-                            .iter()
-                            .find(|m| m.is_name_equal("assertions"))
-                            .map(|m| m.span);
-                        if let Some(span) = matcher_span {
-                            ctx.diagnostic(assertions_requires_one_argument(span));
-                        }
-                    }
-                    1 => {
-                        let arg = &args[0];
-                        if !matches!(arg, Argument::NumericLiteral(_)) {
-                            ctx.diagnostic(assertions_requires_number_argument(arg.span()));
-                        }
-                    }
-                    _ => {
-                        // Extra arguments — suggest removing them (keep only the first).
-                        // Delete from after first arg to before closing `)`,
-                        // accounting for trailing commas.
-                        let extra_start = args[0].span().end;
-                        let extra_end = first_call.span.end - 1;
-                        let extra_span = Span::new(extra_start, extra_end);
-                        let fixer = RuleFixer::new(FixKind::Suggestion, ctx);
-                        let suggestion = fixer
-                            .delete_range(extra_span)
-                            .with_message("Remove extra arguments");
-                        ctx.diagnostic_with_suggestions(
-                            assertions_requires_one_argument(extra_span),
-                            [suggestion],
-                        );
-                    }
-                }
+            _ => {
+                let extra_start = call.arguments[0].span().end;
+                let extra_end = call.span.end - 1;
+                let extra_span = Span::new(extra_start, extra_end);
+                let fixer = RuleFixer::new(FixKind::Suggestion, ctx);
+                let suggestion =
+                    fixer.delete_range(extra_span).with_message("Remove extra arguments");
+                ctx.diagnostic_with_suggestions(
+                    assertions_requires_one_argument(extra_span),
+                    [suggestion],
+                );
             }
-            return true;
         }
-
-        false
     }
 
     /// Determine if the test function should be checked based on configuration options.
@@ -540,6 +588,51 @@ fn get_callback_body_from_call<'a>(
     get_test_callback(call_expr).and_then(get_callback_body)
 }
 
+/// Determines how `expect` is sourced in the test callback for vitest fixtures.
+fn detect_expect_source(callback: &Expression<'_>, is_vitest: bool) -> ExpectSource {
+    if !is_vitest {
+        return ExpectSource::Global;
+    }
+
+    let params = match callback {
+        Expression::FunctionExpression(func) => &func.params,
+        Expression::ArrowFunctionExpression(func) => &func.params,
+        _ => return ExpectSource::Global,
+    };
+
+    let Some(first_param) = params.items.first() else {
+        return ExpectSource::Global;
+    };
+
+    match &first_param.pattern {
+        // `(ctx) => {}` — single identifier param, expect accessed as `ctx.expect`
+        oxc_ast::ast::BindingPattern::BindingIdentifier(id) => {
+            ExpectSource::VariableArg(id.name.to_string())
+        }
+        // `({ expect })` or `({ expect: alias })` — destructured object
+        oxc_ast::ast::BindingPattern::ObjectPattern(pattern) => {
+            let expect_prop = pattern
+                .properties
+                .iter()
+                .find(|prop| prop.key.static_name().is_some_and(|name| name == "expect"));
+
+            let Some(prop) = expect_prop else {
+                // No `expect` key in destructuring — fallback to global
+                return ExpectSource::Global;
+            };
+
+            // Check if renamed: `{ expect: myExpect }` vs `{ expect }`
+            match &prop.value {
+                oxc_ast::ast::BindingPattern::BindingIdentifier(id) if id.name != "expect" => {
+                    ExpectSource::ExpectArgReassigned(id.name.to_string())
+                }
+                _ => ExpectSource::ExpectArgNonReassigned,
+            }
+        }
+        _ => ExpectSource::Global,
+    }
+}
+
 fn is_callback_async(callback: &Expression<'_>) -> bool {
     match callback {
         Expression::FunctionExpression(func) => func.r#async,
@@ -552,7 +645,7 @@ fn is_callback_async(callback: &Expression<'_>) -> bool {
 fn test() {
     use crate::tester::Tester;
 
-    let pass = vec![
+    let mut pass = vec![
         (r#"test("nonsense", [])"#, None),
         (r#"test("it1", () => {expect.assertions(0);})"#, None),
         (r#"test("it1", function() {expect.assertions(0);})"#, None),
@@ -1059,7 +1152,7 @@ fn test() {
         ),
     ];
 
-    let fail = vec![
+    let mut fail = vec![
         (r#"it("it1", () => foo())"#, None),
         ("it('resolves', () => expect(staged()).toBe(true));", None),
         ("it('resolves', async () => expect(await staged()).toBe(true));", None),
@@ -1737,6 +1830,237 @@ fn test() {
         ),
     ];
 
+    let vitest_pass = vec![
+        (r#"test("it1", () => {expect.assertions(0);})"#, None),
+        (r#"test("it1", function() {expect.assertions(0);})"#, None),
+        (r#"test("it1", function() {expect.hasAssertions();})"#, None),
+        (r#"it("it1", function() {expect.assertions(0);})"#, None),
+        (r#"test("it1")"#, None),
+        (r#"itHappensToStartWithIt("foo", function() {})"#, None),
+        (r#"testSomething("bar", function() {})"#, None),
+        ("it(async () => {expect.assertions(0);})", None),
+        (
+            // vitest fixture: destructured expect
+            r#"import * as vi from 'vitest';
+            test("example-fail", async ({ expect }) => {
+                expect.assertions(1);
+                await expect(Promise.resolve(null)).resolves.toBeNull();
+              });
+                "#,
+            None,
+        ),
+        (
+            // vitest fixture: expect accessed as property on context param
+            r#"import { test } from 'vitest';
+            test("ctx param", async (ctx) => {
+                ctx.expect.assertions(1);
+                await ctx.expect(Promise.resolve(null)).resolves.toBeNull();
+              });
+                "#,
+            None,
+        ),
+        (
+            // vitest fixture: renamed destructured expect
+            r#"import { test } from 'vitest';
+            test("renamed expect", async ({ expect: myExpect }) => {
+                myExpect.assertions(1);
+                await myExpect(Promise.resolve(null)).resolves.toBeNull();
+              });
+                "#,
+            None,
+        ),
+        (
+            // vitest fixture: renamed expect with hasAssertions
+            r#"import { test } from 'vitest';
+            test("renamed hasAssertions", async ({ expect: e }) => {
+                e.hasAssertions();
+                await e(Promise.resolve(null)).resolves.toBeNull();
+              });
+                "#,
+            None,
+        ),
+        (
+            // vitest fixture: context variable with hasAssertions
+            r#"import { test } from 'vitest';
+            test("ctx hasAssertions", async (t) => {
+                t.expect.hasAssertions();
+                await t.expect(Promise.resolve(null)).resolves.toBeNull();
+              });
+                "#,
+            None,
+        ),
+        (
+            // vitest fixture: no expect in params, fallback to global
+            r#"import { test, expect } from 'vitest';
+            test("global expect", async () => {
+                expect.assertions(1);
+                await expect(Promise.resolve(null)).resolves.toBeNull();
+              });
+                "#,
+            None,
+        ),
+        (
+            r#"it("it1", () => {
+                expect.assertions(0);
+                const foo = { bar({ baz }) { baz(); } };
+              });
+                "#,
+            None,
+        ),
+        (
+            "
+               const expectNumbersToBeGreaterThan = (numbers, value) => {
+                for (let number of numbers) {
+                expect(number).toBeGreaterThan(value);
+               }
+               };
+
+               it('returns numbers that are greater than two', function () {
+                expectNumbersToBeGreaterThan(getNumbers(), 2);
+               });
+               ",
+            Some(serde_json::json!([{ "onlyFunctionsWithExpectInLoop": true }])),
+        ),
+        (
+            r#"
+               it("returns numbers that are greater than five", function () {
+                expect.assertions(2);
+                for (const number of getNumbers()) {
+                expect(number).toBeGreaterThan(5);
+               }
+               });
+               "#,
+            Some(serde_json::json!([{ "onlyFunctionsWithExpectInLoop": true }])),
+        ),
+        (
+            r#"it("returns things that are less than ten", function () {
+                expect.hasAssertions();
+                for (const thing in things) {
+                 expect(thing).toBeLessThan(10);
+                }
+               });"#,
+            Some(serde_json::json!([{ "onlyFunctionsWithExpectInLoop": true }])),
+        ),
+    ];
+
+    let vitest_fail = vec![
+        (r#"it("it1", () => foo())"#, None),
+        (
+            "
+            it('my test description', ({ expect }) => {
+              const a = 1;
+              const b = 2;
+
+              expect(sum(a, b)).toBe(a + b);
+            })
+            ",
+            None,
+        ),
+        (
+            "
+            it('my test description', (context) => {
+              const a = 1;
+              const b = 2;
+
+              context.expect(sum(a, b)).toBe(a + b);
+            })
+            ",
+            None,
+        ),
+        ("it('resolves', () => expect(staged()).toBe(true));", None),
+        ("it('resolves', async () => expect(await staged()).toBe(true));", None),
+        (r#"it("it1", () => {})"#, None),
+        (r#"it("it1", () => { foo()})"#, None),
+        (r#"it("it1", function() {var a = 2;})"#, None),
+        (r#"it("it1", function() {expect.assertions();})"#, None),
+        (r#"it("it1", function() {expect.assertions(1,2);})"#, None),
+        (r#"it("it1", function() {expect.assertions(1,2,);})"#, None),
+        (r#"it("it1", function() {expect.assertions("1");})"#, None),
+        (r#"it("it1", function() {expect.hasAssertions("1");})"#, None),
+        (r#"it("it1", function() {expect.hasAssertions("1",);})"#, None),
+        (r#"it("it1", function() {expect.hasAssertions("1", "2");})"#, None),
+        (
+            r#"it("it1", () => {
+                expect.hasAssertions();
+
+                for (const number of getNumbers()) {
+                  expect(number).toBeGreaterThan(0);
+                }
+                 });
+
+                 it("it1", () => {
+                for (const number of getNumbers()) {
+                  expect(number).toBeGreaterThan(0);
+                }
+                 });"#,
+            Some(serde_json::json!([{ "onlyFunctionsWithExpectInLoop": true }])),
+        ),
+        (
+            r#"it("returns numbers that are greater than four", async () => {
+                 for (const number of await getNumbers()) {
+                expect(number).toBeGreaterThan(4);
+                 }
+               });
+
+               it("returns numbers that are greater than five", () => {
+                 for (const number of getNumbers()) {
+                expect(number).toBeGreaterThan(5);
+                 }
+               });
+                "#,
+            Some(serde_json::json!([{ "onlyFunctionsWithExpectInLoop": true }])),
+        ),
+        (
+            r#"it("it1", () => {
+                const foo = { bar({ baz }) { baz(); } };
+              });
+                "#,
+            None,
+        ),
+        (
+            // vitest fixture: renamed expect, missing assertions
+            "import * as vi from 'vitest';
+            it('missing assertions', ({ expect: myExpect }) => {
+              myExpect(true).toBe(true);
+            })
+            ",
+            None,
+        ),
+        (
+            // vitest fixture: context variable, missing assertions
+            "import * as vi from 'vitest';
+            it('missing assertions', (ctx) => {
+              ctx.expect(true).toBe(true);
+            })
+            ",
+            None,
+        ),
+        (
+            // vitest fixture: renamed expect, assertions with no argument
+            r#"import * as vi from 'vitest';
+            it("it1", ({ expect: e }) => {e.assertions();})"#,
+            None,
+        ),
+        (
+            // vitest fixture: context variable, assertions with string argument
+            r#"import * as vi from 'vitest';
+            it("it1", (ctx) => {ctx.expect.assertions("1");})"#,
+            None,
+        ),
+        (
+            // vitest fixture: renamed expect, hasAssertions with extra arguments
+            r#"import * as vi from 'vitest';
+            it("it1", ({ expect: e }) => {e.hasAssertions("1");})"#,
+            None,
+        ),
+        (
+            // vitest fixture: context variable, assertions with extra arguments
+            r#"import * as vi from 'vitest';
+            it("it1", (ctx) => {ctx.expect.assertions(1, 2);})"#,
+            None,
+        ),
+    ];
+
     // haveExpectAssertions: two suggestions — expect.hasAssertions() and expect.assertions()
     let fix_two_suggestions = vec![
         (
@@ -1759,6 +2083,62 @@ fn test() {
                 r#"it("it1", function() {expect.hasAssertions();var a = 2;})"#,
                 r#"it("it1", function() {expect.assertions();var a = 2;})"#,
             ),
+        ),
+    ];
+
+    // vitest fixture: two suggestions using the resolved expect prefix
+    let fix_vitest_two_suggestions = vec![
+        // renamed expect: suggestions use `myExpect`
+        (
+            "import * as vi from 'vitest';
+            it('missing assertions', ({ expect: myExpect }) => {
+              myExpect(true).toBe(true);
+            })",
+            (
+                "import * as vi from 'vitest';
+            it('missing assertions', ({ expect: myExpect }) => {myExpect.hasAssertions();
+              myExpect(true).toBe(true);
+            })",
+                "import * as vi from 'vitest';
+            it('missing assertions', ({ expect: myExpect }) => {myExpect.assertions();
+              myExpect(true).toBe(true);
+            })",
+            ),
+        ),
+        // context variable: suggestions use `ctx.expect`
+        (
+            "import * as vi from 'vitest';
+            it('missing assertions', (ctx) => {
+              ctx.expect(true).toBe(true);
+            })",
+            (
+                "import * as vi from 'vitest';
+            it('missing assertions', (ctx) => {ctx.expect.hasAssertions();
+              ctx.expect(true).toBe(true);
+            })",
+                "import * as vi from 'vitest';
+            it('missing assertions', (ctx) => {ctx.expect.assertions();
+              ctx.expect(true).toBe(true);
+            })",
+            ),
+        ),
+    ];
+
+    // vitest fixture: fix cases for malformed args
+    let fix_vitest_remove_args = vec![
+        // renamed expect: hasAssertions with extra args
+        (
+            r#"import * as vi from 'vitest';
+            it("it1", ({ expect: e }) => {e.hasAssertions("1");})"#,
+            r#"import * as vi from 'vitest';
+            it("it1", ({ expect: e }) => {e.hasAssertions();})"#,
+        ),
+        // context variable: assertions with extra args
+        (
+            r#"import * as vi from 'vitest';
+            it("it1", (ctx) => {ctx.expect.assertions(1, 2);})"#,
+            r#"import * as vi from 'vitest';
+            it("it1", (ctx) => {ctx.expect.assertions(1);})"#,
         ),
     ];
 
@@ -1799,9 +2179,15 @@ fn test() {
         ),
     ];
 
+    pass.extend(vitest_pass);
+    fail.extend(vitest_fail);
+
     Tester::new(PreferExpectAssertions::NAME, PreferExpectAssertions::PLUGIN, pass, fail)
         .with_jest_plugin(true)
+        .with_vitest_plugin(true)
         .expect_fix(fix_two_suggestions)
+        .expect_fix(fix_vitest_two_suggestions)
         .expect_fix(fix_remove_args)
+        .expect_fix(fix_vitest_remove_args)
         .test_and_snapshot();
 }
