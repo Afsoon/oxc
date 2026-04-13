@@ -1,5 +1,3 @@
-use cow_utils::CowUtils;
-use lazy_regex::Regex;
 use oxc_ast::{
     AstKind,
     ast::{Argument, Expression, FunctionBody, Statement},
@@ -16,7 +14,8 @@ use crate::{
     rule::Rule,
     rules::PossibleJestNode,
     utils::{
-        JestGeneralFnKind, get_node_name, parse_expect_jest_fn_call, parse_general_jest_fn_call,
+        JestGeneralFnKind, convert_pattern, get_node_name, matches_assert_function_name,
+        parse_expect_jest_fn_call, parse_general_jest_fn_call,
     },
 };
 
@@ -286,32 +285,6 @@ fn function_argument<'a>(argument: &'a Argument<'a>) -> Option<&'a FunctionBody<
         Argument::FunctionExpression(function) => function.body.as_ref().map(AsRef::as_ref),
         _ => None,
     }
-}
-
-/// Checks if node names returned by getNodeName matches any of the given star patterns
-fn matches_assert_function_name(name: &str, patterns: &[CompactStr]) -> bool {
-    patterns.iter().any(|pattern| Regex::new(pattern).unwrap().is_match(name))
-}
-
-fn convert_pattern(pattern: &str) -> CompactStr {
-    // Pre-process pattern, e.g.
-    // request.*.expect -> request.[a-z\\d]*.expect
-    // request.**.expect -> request.[a-z\\d\\.]*.expect
-    // request.**.expect* -> request.[a-z\\d\\.]*.expect[a-z\\d]*
-    let pattern = pattern
-        .split('.')
-        .map(|p| {
-            if p == "**" {
-                CompactStr::from("[a-z\\d\\.]*")
-            } else {
-                p.cow_replace('*', "[a-z\\d]*").into()
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("\\.");
-
-    // 'a.b.c' -> /^a\.b\.c(\.|$)/iu
-    format!("(?ui)^{pattern}(\\.|$)").into()
 }
 
 #[test]
