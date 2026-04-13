@@ -152,6 +152,7 @@ declare_oxc_lint!(
     jest,
     style,
     config = PreferEndingWithAnExpectConfig,
+    version = "next"
 );
 
 impl Rule for PreferEndingWithAnExpect {
