@@ -103,6 +103,7 @@ declare_oxc_lint!(
     jest,
     correctness,
     config = ExpectExpectConfig,
+    version = "0.0.12",
 );
 
 impl Rule for ExpectExpect {

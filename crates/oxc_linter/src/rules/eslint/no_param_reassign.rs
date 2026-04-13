@@ -86,6 +86,7 @@ declare_oxc_lint!(
     eslint,
     restriction,
     config = NoParamReassignConfig,
+    version = "1.20.0",
 );
 
 impl Rule for NoParamReassign {
