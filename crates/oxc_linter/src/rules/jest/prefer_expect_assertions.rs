@@ -1,13 +1,13 @@
 use oxc_ast::{
     AstKind,
-    ast::{Argument, CallExpression, Expression, FunctionBody, Statement},
+    ast::{Argument, BindingPattern, CallExpression, Expression, FunctionBody, Statement},
 };
 use oxc_ast_visit::Visit;
 use oxc_diagnostics::OxcDiagnostic;
 use oxc_macros::declare_oxc_lint;
-use oxc_semantic::NodeId;
+use oxc_semantic::{NodeId, ScopeId};
 use oxc_span::{GetSpan, Span};
-use rustc_hash::FxHashMap;
+use oxc_str::CompactStr;
 use schemars::JsonSchema;
 use serde::Deserialize;
 
@@ -17,47 +17,49 @@ use crate::{
     rule::{DefaultRuleConfig, Rule},
     utils::{
         JestFnKind, JestGeneralFnKind, PossibleJestNode, collect_possible_jest_call_node,
-        get_node_name, parse_expect_jest_fn_call, parse_general_jest_fn_call,
+        get_node_name, parse_general_jest_fn_call,
     },
 };
 
-/// How `expect` is accessed in the test callback.
-enum ExpectSource {
-    /// `expect` from global scope or ESM import — use `parse_expect_jest_fn_call` with span lookup.
-    Global,
-    /// `({ expect }) => {}` — destructured without renaming, still called `expect`.
-    /// Use `parse_expect_jest_fn_call` with a fake `PossibleJestNode`.
-    ExpectArgNonReassigned,
-    /// `({ expect: myExpect }) => {}` — destructured with renaming.
-    /// The `String` holds the local name (e.g. `"myExpect"`).
-    /// Use `get_node_name` to check if it ends with `assertions` or `hasAssertions`.
-    ExpectArgReassigned(String),
-    /// `(ctx) => {}` — single identifier param, `expect` accessed via `ctx.expect`.
-    /// The `String` holds the param name (e.g. `"ctx"`), so expect is `ctx.expect`.
-    /// Use `get_node_name` to check if it ends with `assertions` or `hasAssertions`.
-    VariableArg(String),
+enum ExpectSource<'a> {
+    /// Global or import — borrows the file-level prefix (e.g. `"expect"` or `"e"`).
+    Global(&'a str),
+    /// Vitest fixture arg — owns the prefix (e.g. `"myExpect"`, `"ctx.expect"`).
+    Fixture(CompactStr),
 }
 
-impl ExpectSource {
-    /// Returns the prefix to use in suggestions (e.g. `"expect"`, `"myExpect"`, `"ctx.expect"`).
-    fn expect_prefix(&self) -> String {
+impl ExpectSource<'_> {
+    fn prefix(&self) -> &str {
         match self {
-            Self::Global | Self::ExpectArgNonReassigned => "expect".to_string(),
-            Self::ExpectArgReassigned(name) => name.clone(),
-            Self::VariableArg(name) => format!("{name}.expect"),
+            Self::Global(s) => s,
+            Self::Fixture(s) => s.as_str(),
         }
+    }
+
+    fn is_shadowed_in(&self, callback: &Expression<'_>, ctx: &LintContext<'_>) -> bool {
+        matches!(self, Self::Global(_))
+            && callback_scope_id(callback)
+                .is_some_and(|id| ctx.scoping().get_binding(id, "expect".into()).is_some())
     }
 }
 
-fn has_assertions_takes_no_arguments(span: Span) -> OxcDiagnostic {
-    OxcDiagnostic::warn("`expect.hasAssertions` expects no arguments.")
-        .with_help("Remove the arguments from `expect.hasAssertions()`.")
+fn expect_is_shadowed_by_parameter(span: Span) -> OxcDiagnostic {
+    OxcDiagnostic::warn(
+        "`expect` is shadowed by a callback parameter and cannot be used for assertions.",
+    )
+    .with_help("Rename the parameter to avoid shadowing the global `expect`.")
+    .with_label(span)
+}
+
+fn has_assertions_takes_no_arguments(span: Span, prefix: &str) -> OxcDiagnostic {
+    OxcDiagnostic::warn(format!("`{prefix}.hasAssertions` expects no arguments."))
+        .with_help(format!("Remove the arguments from `{prefix}.hasAssertions()`."))
         .with_label(span)
 }
 
-fn assertions_requires_one_argument(span: Span) -> OxcDiagnostic {
-    OxcDiagnostic::warn("`expect.assertions` expects a single argument of type number.")
-        .with_help("Pass a single numeric argument to `expect.assertions()`.")
+fn assertions_requires_one_argument(span: Span, prefix: &str) -> OxcDiagnostic {
+    OxcDiagnostic::warn(format!("`{prefix}.assertions` expects a single argument of type number."))
+        .with_help(format!("Pass a single numeric argument to `{prefix}.assertions()`."))
         .with_label(span)
 }
 
@@ -67,11 +69,11 @@ fn assertions_requires_number_argument(span: Span) -> OxcDiagnostic {
         .with_label(span)
 }
 
-fn have_expect_assertions(span: Span) -> OxcDiagnostic {
-    OxcDiagnostic::warn(
-        "Every test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.",
-    )
-    .with_help("Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in the test.")
+fn have_expect_assertions(span: Span, prefix: &str) -> OxcDiagnostic {
+    OxcDiagnostic::warn(format!(
+        "Every test should have either `{prefix}.assertions(<number of assertions>)` or `{prefix}.hasAssertions()` as its first expression.",
+    ))
+    .with_help(format!("Add `{prefix}.hasAssertions()` or `{prefix}.assertions(<number>)` as the first statement in the test."))
     .with_label(span)
 }
 
@@ -139,18 +141,15 @@ impl Rule for PreferExpectAssertions {
         let mut possible_jest_nodes = collect_possible_jest_call_node(ctx);
         possible_jest_nodes.sort_unstable_by_key(|n| n.node.id());
 
-        // Build a span → PossibleJestNode lookup so inner calls (e.g.
-        // expect.hasAssertions inside a beforeEach callback) can be
-        // resolved with the correct import-alias context.
-        let span_lookup: FxHashMap<Span, &PossibleJestNode<'_, '_>> =
-            possible_jest_nodes.iter().map(|n| (n.node.span(), n)).collect();
+        // Resolve the file-level expect local name once (e.g. `"expect"` or `"e"`
+        // for `import { expect as e }`). Per-callback vitest fixture overrides
+        // are handled in `resolve_expect_source`.
+        let file_expect_prefix = resolve_expect_local_name(ctx);
 
-        // Track which describe scopes (by NodeId) are covered by
-        // beforeEach/afterEach hooks that contain expect.hasAssertions().
         let mut covered_describe_ids: Vec<NodeId> = Vec::new();
 
         for jest_node in &possible_jest_nodes {
-            self.check_node(jest_node, &span_lookup, &mut covered_describe_ids, ctx);
+            self.check_node(jest_node, &file_expect_prefix, &mut covered_describe_ids, ctx);
         }
     }
 }
@@ -159,7 +158,7 @@ impl PreferExpectAssertions {
     fn check_node<'a>(
         &self,
         jest_node: &PossibleJestNode<'a, '_>,
-        span_lookup: &FxHashMap<Span, &PossibleJestNode<'a, '_>>,
+        file_expect_prefix: &CompactStr,
         covered_describe_ids: &mut Vec<NodeId>,
         ctx: &LintContext<'a>,
     ) {
@@ -179,28 +178,28 @@ impl PreferExpectAssertions {
         match kind {
             JestGeneralFnKind::Hook => {
                 if general.name.ends_with("Each") {
-                    self.check_each_hook(call_expr, node.id(), covered_describe_ids, ctx);
+                    Self::check_each_hook(call_expr, node.id(), file_expect_prefix, covered_describe_ids, ctx);
                 }
             }
             JestGeneralFnKind::Test => {
-                self.check_test(call_expr, node.id(), span_lookup, covered_describe_ids, ctx);
+                self.check_test(call_expr, node.id(), file_expect_prefix, covered_describe_ids, ctx);
             }
             _ => {}
         }
     }
 
     fn check_each_hook(
-        &self,
         call_expr: &CallExpression<'_>,
         hook_node_id: NodeId,
+        file_expect_prefix: &CompactStr,
         covered_describe_ids: &mut Vec<NodeId>,
         ctx: &LintContext<'_>,
     ) {
-        let Some(body) = get_callback_body_from_call(call_expr) else {
+        let Some(body) = find_test_callback(call_expr).and_then(callback_body) else {
             return;
         };
 
-        let mut scanner = HookScanner::default();
+        let mut scanner = HookScanner::new(file_expect_prefix);
         scanner.visit_function_body(body);
 
         if !scanner.has_expect_has_assertions {
@@ -213,7 +212,7 @@ impl PreferExpectAssertions {
             let fixer = RuleFixer::new(FixKind::Suggestion, ctx);
             let suggestion = fixer.delete_range(delete_span).with_message("Remove extra arguments");
             ctx.diagnostic_with_suggestions(
-                has_assertions_takes_no_arguments(args_span),
+                has_assertions_takes_no_arguments(args_span, file_expect_prefix),
                 [suggestion],
             );
         }
@@ -224,7 +223,7 @@ impl PreferExpectAssertions {
             .nodes()
             .ancestors(hook_node_id)
             .find(|n| matches!(n.kind(), AstKind::CallExpression(c) if is_describe_call(c)))
-            .map_or(NodeId::ROOT, |n| n.id());
+            .map_or(NodeId::ROOT, oxc_semantic::AstNode::id);
 
         if !covered_describe_ids.contains(&parent_describe_id) {
             covered_describe_ids.push(parent_describe_id);
@@ -235,7 +234,7 @@ impl PreferExpectAssertions {
         &self,
         call_expr: &'a CallExpression<'a>,
         test_node_id: NodeId,
-        span_lookup: &FxHashMap<Span, &PossibleJestNode<'a, '_>>,
+        file_expect_prefix: &CompactStr,
         covered_describe_ids: &[NodeId],
         ctx: &LintContext<'a>,
     ) {
@@ -243,52 +242,38 @@ impl PreferExpectAssertions {
             return;
         }
 
-        let Some(callback) = get_test_callback(call_expr) else {
+        let Some(callback) = find_test_callback(call_expr) else {
             return;
         };
 
-        let Some(body) = get_callback_body(callback) else {
+        let Some(body) = callback_body(callback) else {
             return;
         };
 
-        let expect_source = detect_expect_source(callback, ctx.frameworks().is_vitest());
-
-        // Check if first statement is expect.assertions / expect.hasAssertions
-        if self.check_first_statement(body, span_lookup, &expect_source, ctx) {
+        if is_covered_by_hook(test_node_id, covered_describe_ids, ctx) {
             return;
         }
 
-        // Check if covered by a beforeEach/afterEach hook in an ancestor describe
-        if !covered_describe_ids.is_empty() {
-            // ROOT means a top-level hook covers everything
-            if covered_describe_ids.contains(&NodeId::ROOT) {
-                return;
+        let expect_source = resolve_expect_source(callback, file_expect_prefix.as_str(), ctx);
+
+        if expect_source.is_shadowed_in(callback, ctx) {
+            if !ctx.frameworks().is_vitest() {
+                ctx.diagnostic(expect_is_shadowed_by_parameter(call_expr.callee.span()));
             }
-            let is_covered = ctx.nodes().ancestors(test_node_id).any(|ancestor| {
-                matches!(ancestor.kind(), AstKind::CallExpression(c) if is_describe_call(c))
-                    && covered_describe_ids.contains(&ancestor.id())
-            });
-            if is_covered {
-                return;
-            }
+            return;
         }
 
-        // If any option is set, check whether this test actually needs assertions
-        if self.only_functions_with_async_keyword
-            || self.only_functions_with_expect_in_callback
-            || self.only_functions_with_expect_in_loop
+        if self.has_options()
+            && !self.should_check(body, is_async_callback(callback), expect_source.prefix())
         {
-            let is_async = is_callback_async(callback);
-
-            if !self.should_check(body, is_async) {
-                return;
-            }
+            return;
         }
 
-        // Suggest adding `<prefix>.hasAssertions()` or `<prefix>.assertions()` at
-        // the start of the test body. The prefix is the resolved expect name
-        // (e.g. `expect`, `myExpect`, `ctx.expect`).
-        let prefix = expect_source.expect_prefix();
+        if Self::check_first_statement(body, &expect_source, ctx) {
+            return;
+        }
+
+        let prefix = expect_source.prefix();
         let insert_pos = Span::new(body.span.start + 1, body.span.start + 1);
         let fixer = RuleFixer::new(FixKind::Suggestion, ctx);
         let suggestions = [
@@ -300,17 +285,22 @@ impl PreferExpectAssertions {
                 .with_message(format!("Add `{prefix}.assertions(<number of assertions>)`")),
         ];
 
-        ctx.diagnostic_with_suggestions(have_expect_assertions(call_expr.span), suggestions);
+        ctx.diagnostic_with_suggestions(
+            have_expect_assertions(call_expr.span, prefix),
+            suggestions,
+        );
     }
 
-    /// Returns true if first statement is a valid expect.assertions/expect.hasAssertions call.
-    /// Also validates the arguments and reports diagnostics for malformed calls.
-    fn check_first_statement<'a>(
-        &self,
-        body: &'a FunctionBody<'a>,
-        span_lookup: &FxHashMap<Span, &PossibleJestNode<'a, '_>>,
-        expect_source: &ExpectSource,
-        ctx: &LintContext<'a>,
+    fn has_options(&self) -> bool {
+        self.only_functions_with_async_keyword
+            || self.only_functions_with_expect_in_callback
+            || self.only_functions_with_expect_in_loop
+    }
+
+    fn check_first_statement(
+        body: &FunctionBody<'_>,
+        expect_source: &ExpectSource<'_>,
+        ctx: &LintContext<'_>,
     ) -> bool {
         let Some(Statement::ExpressionStatement(first_expr_stmt)) = body.statements.first() else {
             return false;
@@ -320,161 +310,118 @@ impl PreferExpectAssertions {
             return false;
         };
 
-        match expect_source {
-            // For reassigned expect or variable arg (e.g. `myExpect.assertions(1)` or
-            // `ctx.expect.assertions(1)`), we can't use parse_expect_jest_fn_call because
-            // the callee name isn't `expect`. Instead, check via get_node_name.
-            ExpectSource::ExpectArgReassigned(_) | ExpectSource::VariableArg(_) => {
-                let name = get_node_name(&first_call.callee);
-                if name.ends_with(".hasAssertions") || name.ends_with("hasAssertions") {
-                    self.check_has_assertions_args(first_call, ctx);
-                    return true;
-                }
-                if name.ends_with(".assertions") || name.ends_with("assertions") {
-                    self.check_assertions_args(first_call, ctx);
-                    return true;
-                }
-                false
-            }
-            // For global or non-reassigned fixture expect, use parse_expect_jest_fn_call
-            ExpectSource::Global | ExpectSource::ExpectArgNonReassigned => {
-                let inner_jest_node =
-                    if matches!(expect_source, ExpectSource::ExpectArgNonReassigned) {
-                        &PossibleJestNode {
-                            node: ctx.nodes().get_node(first_call.node_id()),
-                            original: None,
-                        }
-                    } else {
-                        let Some(n) = span_lookup.get(&first_call.span) else {
-                            return false;
-                        };
-                        *n
-                    };
+        let name = get_node_name(&first_call.callee);
+        let prefix = expect_source.prefix();
 
-                let Some(expect_call) =
-                    parse_expect_jest_fn_call(first_call, inner_jest_node, ctx)
-                else {
-                    return false;
-                };
-
-                if expect_call.members.iter().any(|m| m.is_name_equal("hasAssertions")) {
-                    self.check_has_assertions_args(first_call, ctx);
-                    return true;
-                }
-
-                if expect_call.members.iter().any(|m| m.is_name_equal("assertions")) {
-                    self.check_assertions_args(first_call, ctx);
-                    return true;
-                }
-
-                false
-            }
+        if name.ends_with("hasAssertions") {
+            validate_has_assertions_args(first_call, prefix, ctx);
+            true
+        } else if name.ends_with("assertions") {
+            validate_assertions_args(first_call, prefix, ctx);
+            true
+        } else {
+            false
         }
     }
 
-    /// Validate `expect.hasAssertions()` takes no arguments.
-    fn check_has_assertions_args(&self, call: &CallExpression<'_>, ctx: &LintContext<'_>) {
-        if call.arguments.is_empty() {
-            return;
-        }
-        if let Some(args_span) = call.arguments_span() {
-            let delete_span = Span::new(args_span.start, call.span.end - 1);
-            let fixer = RuleFixer::new(FixKind::Suggestion, ctx);
-            let suggestion = fixer.delete_range(delete_span).with_message("Remove extra arguments");
-            ctx.diagnostic_with_suggestions(
-                has_assertions_takes_no_arguments(args_span),
-                [suggestion],
-            );
-        }
-    }
-
-    /// Validate `expect.assertions(n)` takes exactly one numeric argument.
-    fn check_assertions_args(&self, call: &CallExpression<'_>, ctx: &LintContext<'_>) {
-        match call.arguments.len() {
-            0 => {
-                ctx.diagnostic(assertions_requires_one_argument(call.callee.span()));
-            }
-            1 => {
-                let arg = &call.arguments[0];
-                if !matches!(arg, Argument::NumericLiteral(_)) {
-                    ctx.diagnostic(assertions_requires_number_argument(arg.span()));
-                }
-            }
-            _ => {
-                let extra_start = call.arguments[0].span().end;
-                let extra_end = call.span.end - 1;
-                let extra_span = Span::new(extra_start, extra_end);
-                let fixer = RuleFixer::new(FixKind::Suggestion, ctx);
-                let suggestion =
-                    fixer.delete_range(extra_span).with_message("Remove extra arguments");
-                ctx.diagnostic_with_suggestions(
-                    assertions_requires_one_argument(extra_span),
-                    [suggestion],
-                );
-            }
-        }
-    }
-
-    /// Determine if the test function should be checked based on configuration options.
-    fn should_check(&self, body: &FunctionBody<'_>, is_async: bool) -> bool {
+    fn should_check(&self, body: &FunctionBody<'_>, is_async: bool, prefix: &str) -> bool {
         if self.only_functions_with_async_keyword && is_async {
             return true;
         }
 
-        if self.only_functions_with_expect_in_callback || self.only_functions_with_expect_in_loop {
-            // Start at expression_depth -1 because visit_function_body will
-            // immediately increment to 0 for the test callback's own body.
-            // Nested callbacks will be at depth >= 1.
-            let mut scanner = BodyScanner { expression_depth: -1, ..BodyScanner::default() };
-            scanner.visit_function_body(body);
-
-            if self.only_functions_with_expect_in_callback && scanner.has_expect_in_callback {
-                return true;
-            }
-
-            if self.only_functions_with_expect_in_loop && scanner.has_expect_in_loop {
-                return true;
-            }
+        if !self.only_functions_with_expect_in_callback && !self.only_functions_with_expect_in_loop
+        {
+            return false;
         }
 
-        false
+        let mut scanner = BodyScanner::new(prefix);
+        scanner.visit_function_body(body);
+
+        let has_callback =
+            self.only_functions_with_expect_in_callback && scanner.has_expect_in_callback;
+        let has_loop = self.only_functions_with_expect_in_loop && scanner.has_expect_in_loop;
+
+        has_callback || has_loop
     }
 }
 
-/// Scans a hook body for `expect.hasAssertions()` calls at any depth.
-#[derive(Default)]
+fn validate_has_assertions_args(call: &CallExpression<'_>, prefix: &str, ctx: &LintContext<'_>) {
+    if call.arguments.is_empty() {
+        return;
+    }
+    if let Some(args_span) = call.arguments_span() {
+        let delete_span = Span::new(args_span.start, call.span.end - 1);
+        let fixer = RuleFixer::new(FixKind::Suggestion, ctx);
+        let suggestion = fixer.delete_range(delete_span).with_message("Remove extra arguments");
+        ctx.diagnostic_with_suggestions(
+            has_assertions_takes_no_arguments(args_span, prefix),
+            [suggestion],
+        );
+    }
+}
+
+fn validate_assertions_args(call: &CallExpression<'_>, prefix: &str, ctx: &LintContext<'_>) {
+    match call.arguments.len() {
+        0 => {
+            ctx.diagnostic(assertions_requires_one_argument(call.callee.span(), prefix));
+        }
+        1 => {
+            let arg = &call.arguments[0];
+            if !matches!(arg, Argument::NumericLiteral(_)) {
+                ctx.diagnostic(assertions_requires_number_argument(arg.span()));
+            }
+        }
+        _ => {
+            let extra_start = call.arguments[0].span().end;
+            let extra_end = call.span.end - 1;
+            let extra_span = Span::new(extra_start, extra_end);
+            let fixer = RuleFixer::new(FixKind::Suggestion, ctx);
+            let suggestion = fixer.delete_range(extra_span).with_message("Remove extra arguments");
+            ctx.diagnostic_with_suggestions(
+                assertions_requires_one_argument(extra_span, prefix),
+                [suggestion],
+            );
+        }
+    }
+}
+
 struct HookScanner {
+    /// The expected callee name, e.g. `"expect.hasAssertions"` or `"e.hasAssertions"`.
+    expected_name: CompactStr,
     has_expect_has_assertions: bool,
-    /// If hasAssertions was called with arguments, store the args span for diagnostic.
     has_assertions_invalid_args_span: Option<Span>,
-    /// The call expression span, used to find the closing `)` for the fix.
     has_assertions_call_span: Option<Span>,
+}
+
+impl HookScanner {
+    fn new(prefix: &str) -> Self {
+        Self {
+            expected_name: CompactStr::from(format!("{prefix}.hasAssertions")),
+            has_expect_has_assertions: false,
+            has_assertions_invalid_args_span: None,
+            has_assertions_call_span: None,
+        }
+    }
 }
 
 impl<'a> Visit<'a> for HookScanner {
     fn visit_call_expression(&mut self, call_expr: &CallExpression<'a>) {
-        if let Expression::StaticMemberExpression(member) = &call_expr.callee {
-            if member.property.name == "hasAssertions" {
-                if let Some(id) = member.object.get_identifier_reference() {
-                    if id.name == "expect" {
-                        self.has_expect_has_assertions = true;
-                        if !call_expr.arguments.is_empty() {
-                            self.has_assertions_invalid_args_span = call_expr.arguments_span();
-                            self.has_assertions_call_span = Some(call_expr.span);
-                        }
-                    }
-                }
+        if get_node_name(&call_expr.callee) == self.expected_name.as_str() {
+            self.has_expect_has_assertions = true;
+            if !call_expr.arguments.is_empty() {
+                self.has_assertions_invalid_args_span = call_expr.arguments_span();
+                self.has_assertions_call_span = Some(call_expr.span);
             }
         }
         oxc_ast_visit::walk::walk_call_expression(self, call_expr);
     }
 }
 
-#[derive(Default)]
 struct BodyScanner {
-    /// Nesting depth of function expressions / arrow functions.
-    /// 0 = top-level of the test callback body, >0 = inside a nested callback.
-    /// Starts at -1 so that the initial visit_function_body brings it to 0.
+    /// The expect prefix to match (e.g. `"expect"`, `"e"`, `"ctx.expect"`).
+    prefix: CompactStr,
+    /// Precomputed `"prefix."` for starts_with checks, avoiding allocation per call.
+    prefix_dot: CompactStr,
     expression_depth: i32,
     in_loop: bool,
     has_expect_in_callback: bool,
@@ -482,20 +429,33 @@ struct BodyScanner {
 }
 
 impl BodyScanner {
-    fn is_expect_call(call_expr: &CallExpression<'_>) -> bool {
-        match &call_expr.callee {
-            Expression::Identifier(ident) => ident.name == "expect",
-            Expression::StaticMemberExpression(member) => {
-                member.object.get_identifier_reference().is_some_and(|id| id.name == "expect")
-            }
-            _ => false,
+    fn new(prefix: &str) -> Self {
+        Self {
+            prefix: CompactStr::from(prefix),
+            prefix_dot: CompactStr::from(format!("{prefix}.")),
+            expression_depth: -1,
+            in_loop: false,
+            has_expect_in_callback: false,
+            has_expect_in_loop: false,
         }
+    }
+
+    fn visit_loop(&mut self, walk: impl FnOnce(&mut Self)) {
+        let was = self.in_loop;
+        self.in_loop = true;
+        walk(self);
+        self.in_loop = was;
+    }
+
+    fn is_expect_call(&self, call_expr: &CallExpression<'_>) -> bool {
+        let name = get_node_name(&call_expr.callee);
+        name == self.prefix.as_str() || name.starts_with(self.prefix_dot.as_str())
     }
 }
 
 impl<'a> Visit<'a> for BodyScanner {
     fn visit_call_expression(&mut self, call_expr: &CallExpression<'a>) {
-        if Self::is_expect_call(call_expr) {
+        if self.is_expect_call(call_expr) {
             if self.expression_depth > 0 {
                 self.has_expect_in_callback = true;
             }
@@ -512,40 +472,38 @@ impl<'a> Visit<'a> for BodyScanner {
         self.expression_depth -= 1;
     }
 
-    fn visit_for_statement(&mut self, stmt: &oxc_ast::ast::ForStatement<'a>) {
-        let was = self.in_loop;
-        self.in_loop = true;
-        oxc_ast_visit::walk::walk_for_statement(self, stmt);
-        self.in_loop = was;
+    fn visit_for_statement(&mut self, it: &oxc_ast::ast::ForStatement<'a>) {
+        self.visit_loop(|s| oxc_ast_visit::walk::walk_for_statement(s, it));
     }
+    fn visit_for_in_statement(&mut self, it: &oxc_ast::ast::ForInStatement<'a>) {
+        self.visit_loop(|s| oxc_ast_visit::walk::walk_for_in_statement(s, it));
+    }
+    fn visit_for_of_statement(&mut self, it: &oxc_ast::ast::ForOfStatement<'a>) {
+        self.visit_loop(|s| oxc_ast_visit::walk::walk_for_of_statement(s, it));
+    }
+    fn visit_while_statement(&mut self, it: &oxc_ast::ast::WhileStatement<'a>) {
+        self.visit_loop(|s| oxc_ast_visit::walk::walk_while_statement(s, it));
+    }
+    fn visit_do_while_statement(&mut self, it: &oxc_ast::ast::DoWhileStatement<'a>) {
+        self.visit_loop(|s| oxc_ast_visit::walk::walk_do_while_statement(s, it));
+    }
+}
 
-    fn visit_for_in_statement(&mut self, stmt: &oxc_ast::ast::ForInStatement<'a>) {
-        let was = self.in_loop;
-        self.in_loop = true;
-        oxc_ast_visit::walk::walk_for_in_statement(self, stmt);
-        self.in_loop = was;
+fn is_covered_by_hook(
+    test_node_id: NodeId,
+    covered_describe_ids: &[NodeId],
+    ctx: &LintContext<'_>,
+) -> bool {
+    if covered_describe_ids.is_empty() {
+        return false;
     }
-
-    fn visit_for_of_statement(&mut self, stmt: &oxc_ast::ast::ForOfStatement<'a>) {
-        let was = self.in_loop;
-        self.in_loop = true;
-        oxc_ast_visit::walk::walk_for_of_statement(self, stmt);
-        self.in_loop = was;
+    if covered_describe_ids.contains(&NodeId::ROOT) {
+        return true;
     }
-
-    fn visit_while_statement(&mut self, stmt: &oxc_ast::ast::WhileStatement<'a>) {
-        let was = self.in_loop;
-        self.in_loop = true;
-        oxc_ast_visit::walk::walk_while_statement(self, stmt);
-        self.in_loop = was;
-    }
-
-    fn visit_do_while_statement(&mut self, stmt: &oxc_ast::ast::DoWhileStatement<'a>) {
-        let was = self.in_loop;
-        self.in_loop = true;
-        oxc_ast_visit::walk::walk_do_while_statement(self, stmt);
-        self.in_loop = was;
-    }
+    ctx.nodes().ancestors(test_node_id).any(|ancestor| {
+        matches!(ancestor.kind(), AstKind::CallExpression(c) if is_describe_call(c))
+            && covered_describe_ids.contains(&ancestor.id())
+    })
 }
 
 fn is_describe_call(call_expr: &CallExpression<'_>) -> bool {
@@ -568,13 +526,21 @@ fn is_describe_call(call_expr: &CallExpression<'_>) -> bool {
         .is_some_and(|jest_kind| matches!(jest_kind, JestGeneralFnKind::Describe))
 }
 
-fn get_test_callback<'a>(call_expr: &'a CallExpression<'a>) -> Option<&'a Expression<'a>> {
+fn callback_scope_id(callback: &Expression<'_>) -> Option<ScopeId> {
+    match callback {
+        Expression::FunctionExpression(func) => func.scope_id.get(),
+        Expression::ArrowFunctionExpression(func) => func.scope_id.get(),
+        _ => None,
+    }
+}
+
+fn find_test_callback<'a>(call_expr: &'a CallExpression<'a>) -> Option<&'a Expression<'a>> {
     call_expr.arguments.iter().rev().filter_map(|arg| arg.as_expression()).find(|expr| {
         matches!(expr, Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_))
     })
 }
 
-fn get_callback_body<'a>(callback: &'a Expression<'a>) -> Option<&'a FunctionBody<'a>> {
+fn callback_body<'a>(callback: &'a Expression<'a>) -> Option<&'a FunctionBody<'a>> {
     match callback {
         Expression::FunctionExpression(func) => func.body.as_ref().map(AsRef::as_ref),
         Expression::ArrowFunctionExpression(func) => Some(&func.body),
@@ -582,58 +548,75 @@ fn get_callback_body<'a>(callback: &'a Expression<'a>) -> Option<&'a FunctionBod
     }
 }
 
-fn get_callback_body_from_call<'a>(
-    call_expr: &'a CallExpression<'a>,
-) -> Option<&'a FunctionBody<'a>> {
-    get_test_callback(call_expr).and_then(get_callback_body)
+fn resolve_expect_source<'p>(
+    callback: &Expression<'_>,
+    file_expect_prefix: &'p str,
+    ctx: &LintContext<'_>,
+) -> ExpectSource<'p> {
+    if let Some(source) = resolve_expect_from_fixture_param(callback, ctx.frameworks().is_vitest())
+    {
+        return source;
+    }
+
+    ExpectSource::Global(file_expect_prefix)
 }
 
-/// Determines how `expect` is sourced in the test callback for vitest fixtures.
-fn detect_expect_source(callback: &Expression<'_>, is_vitest: bool) -> ExpectSource {
+fn resolve_expect_from_fixture_param<'p>(
+    callback: &Expression<'_>,
+    is_vitest: bool,
+) -> Option<ExpectSource<'p>> {
     if !is_vitest {
-        return ExpectSource::Global;
+        return None;
     }
 
     let params = match callback {
         Expression::FunctionExpression(func) => &func.params,
         Expression::ArrowFunctionExpression(func) => &func.params,
-        _ => return ExpectSource::Global,
+        _ => return None,
     };
 
-    let Some(first_param) = params.items.first() else {
-        return ExpectSource::Global;
-    };
+    let first_param = params.items.first()?;
 
     match &first_param.pattern {
-        // `(ctx) => {}` — single identifier param, expect accessed as `ctx.expect`
-        oxc_ast::ast::BindingPattern::BindingIdentifier(id) => {
-            ExpectSource::VariableArg(id.name.to_string())
+        BindingPattern::BindingIdentifier(id) => {
+            Some(ExpectSource::Fixture(CompactStr::from(format!("{}.expect", id.name))))
         }
-        // `({ expect })` or `({ expect: alias })` — destructured object
-        oxc_ast::ast::BindingPattern::ObjectPattern(pattern) => {
-            let expect_prop = pattern
+        BindingPattern::ObjectPattern(pattern) => {
+            let prop = pattern
                 .properties
                 .iter()
-                .find(|prop| prop.key.static_name().is_some_and(|name| name == "expect"));
+                .find(|p| p.key.static_name().is_some_and(|name| name == "expect"))?;
 
-            let Some(prop) = expect_prop else {
-                // No `expect` key in destructuring — fallback to global
-                return ExpectSource::Global;
+            let local_name = match &prop.value {
+                BindingPattern::BindingIdentifier(id) => id.name.as_str(),
+                _ => "expect",
             };
-
-            // Check if renamed: `{ expect: myExpect }` vs `{ expect }`
-            match &prop.value {
-                oxc_ast::ast::BindingPattern::BindingIdentifier(id) if id.name != "expect" => {
-                    ExpectSource::ExpectArgReassigned(id.name.to_string())
-                }
-                _ => ExpectSource::ExpectArgNonReassigned,
-            }
+            Some(ExpectSource::Fixture(CompactStr::from(local_name)))
         }
-        _ => ExpectSource::Global,
+        _ => None,
     }
 }
 
-fn is_callback_async(callback: &Expression<'_>) -> bool {
+fn resolve_expect_local_name(ctx: &LintContext<'_>) -> CompactStr {
+    for entry in &ctx.module_record().import_entries {
+        let source = entry.module_request.name();
+        if source != "@jest/globals" && source != "vitest" && source != "vite-plus/test" {
+            continue;
+        }
+        if entry.is_type {
+            continue;
+        }
+        let crate::module_record::ImportImportName::Name(import_name) = &entry.import_name else {
+            continue;
+        };
+        if import_name.name() == "expect" {
+            return CompactStr::from(entry.local_name.name());
+        }
+    }
+    CompactStr::from("expect")
+}
+
+fn is_async_callback(callback: &Expression<'_>) -> bool {
     match callback {
         Expression::FunctionExpression(func) => func.r#async,
         Expression::ArrowFunctionExpression(func) => func.r#async,
@@ -1148,6 +1131,14 @@ fn test() {
                 expect.hasAssertions();
               });
             });",
+            None,
+        ),
+        (
+            r#"import { expect as e } from '@jest/globals';
+            test("reassigned jest import", () => {
+                e.assertions(1);
+                e(true).toBe(true);
+              });"#,
             None,
         ),
     ];
@@ -1828,6 +1819,12 @@ fn test() {
             });"#,
             Some(serde_json::json!([{ "onlyFunctionsWithAsyncKeyword": true }])),
         ),
+        (
+            // jest import reassignment: missing assertions
+            r#"import { expect as e } from '@jest/globals';
+            test("reassigned", () => { e(true).toBe(true); });"#,
+            None,
+        ),
     ];
 
     let vitest_pass = vec![
@@ -1900,6 +1897,56 @@ fn test() {
             None,
         ),
         (
+            // import reassignment from vitest
+            r#"import { expect as e } from 'vitest';
+            test("reassigned vitest import", () => {
+                e.assertions(1);
+                e(true).toBe(true);
+              });
+                "#,
+            None,
+        ),
+        (
+            // Re-exported vitest: renamed expect from a third-party re-export
+            r#"import { expect as e } from 'vite-plus/test';
+            test("re-exported vitest", () => {
+                e.assertions(1);
+                e(true).toBe(true);
+              });"#,
+            None,
+        ),
+        (
+            // Re-exported vitest: global expect from a third-party re-export
+            r#"import { expect } from 'vite-plus/test';
+            test("re-exported vitest global", () => {
+                expect.assertions(1);
+                expect(true).toBe(true);
+              });"#,
+            None,
+        ),
+        (
+            // beforeEach with renamed import covers the describe
+            "import { expect as e } from 'vitest';
+            describe('suite', () => {
+                beforeEach(() => { e.hasAssertions(); });
+                it('test', () => {
+                    e(true).toBe(true);
+                });
+            });",
+            None,
+        ),
+        (
+            // beforeEach with renamed jest import covers the describe
+            "import { expect as e } from '@jest/globals';
+            describe('suite', () => {
+                beforeEach(() => { e.hasAssertions(); });
+                it('test', () => {
+                    e(true).toBe(true);
+                });
+            });",
+            None,
+        ),
+        (
             r#"it("it1", () => {
                 expect.assertions(0);
                 const foo = { bar({ baz }) { baz(); } };
@@ -1947,6 +1994,7 @@ fn test() {
         (r#"it("it1", () => foo())"#, None),
         (
             "
+            import * as vi from 'vitest';
             it('my test description', ({ expect }) => {
               const a = 1;
               const b = 2;
@@ -2059,6 +2107,30 @@ fn test() {
             it("it1", (ctx) => {ctx.expect.assertions(1, 2);})"#,
             None,
         ),
+        (
+            // vitest import reassignment: missing assertions
+            r#"import { expect as e } from 'vitest';
+            test("reassigned", () => { e(true).toBe(true); });"#,
+            None,
+        ),
+        (
+            // Re-exported vitest: missing assertions
+            r#"import { expect as e } from 'vite-plus/test';
+            test("re-exported missing", () => { e(true).toBe(true); });"#,
+            None,
+        ),
+        (
+            // beforeEach uses global `expect.hasAssertions()` but import is renamed to `e`.
+            // The hook doesn't match the renamed prefix, so the test is NOT covered.
+            "import { expect as e } from 'vitest';
+            describe('suite', () => {
+                beforeEach(() => { expect.hasAssertions(); });
+                it('test', () => {
+                    e(true).toBe(true);
+                });
+            });",
+            None,
+        ),
     ];
 
     // haveExpectAssertions: two suggestions — expect.hasAssertions() and expect.assertions()
@@ -2082,6 +2154,32 @@ fn test() {
             (
                 r#"it("it1", function() {expect.hasAssertions();var a = 2;})"#,
                 r#"it("it1", function() {expect.assertions();var a = 2;})"#,
+            ),
+        ),
+    ];
+
+    // import reassignment: suggestions use the local alias
+    let fix_import_reassignment = vec![
+        // jest import reassignment
+        (
+            r#"import { expect as e } from '@jest/globals';
+            test("reassigned", () => { e(true).toBe(true); });"#,
+            (
+                r#"import { expect as e } from '@jest/globals';
+            test("reassigned", () => {e.hasAssertions(); e(true).toBe(true); });"#,
+                r#"import { expect as e } from '@jest/globals';
+            test("reassigned", () => {e.assertions(); e(true).toBe(true); });"#,
+            ),
+        ),
+        // vitest import reassignment
+        (
+            r#"import { expect as e } from 'vitest';
+            test("reassigned", () => { e(true).toBe(true); });"#,
+            (
+                r#"import { expect as e } from 'vitest';
+            test("reassigned", () => {e.hasAssertions(); e(true).toBe(true); });"#,
+                r#"import { expect as e } from 'vitest';
+            test("reassigned", () => {e.assertions(); e(true).toBe(true); });"#,
             ),
         ),
     ];
@@ -2171,11 +2269,18 @@ fn test() {
         // hasAssertions with extra args in hooks
         (
             r#"beforeEach(() => { expect.hasAssertions("1") })"#,
-            r#"beforeEach(() => { expect.hasAssertions() })"#,
+            r"beforeEach(() => { expect.hasAssertions() })",
         ),
         (
             r#"afterEach(() => { expect.hasAssertions("1") })"#,
-            r#"afterEach(() => { expect.hasAssertions() })"#,
+            r"afterEach(() => { expect.hasAssertions() })",
+        ),
+        // hook with renamed import and extra args
+        (
+            r#"import { expect as e } from 'vitest';
+            beforeEach(() => { e.hasAssertions("1") })"#,
+            "import { expect as e } from 'vitest';
+            beforeEach(() => { e.hasAssertions() })",
         ),
     ];
 
@@ -2186,6 +2291,7 @@ fn test() {
         .with_jest_plugin(true)
         .with_vitest_plugin(true)
         .expect_fix(fix_two_suggestions)
+        .expect_fix(fix_import_reassignment)
         .expect_fix(fix_vitest_two_suggestions)
         .expect_fix(fix_remove_args)
         .expect_fix(fix_vitest_remove_args)
