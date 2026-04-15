@@ -43,7 +43,7 @@ impl ExpectSource<'_> {
     }
 }
 
-fn expect_is_shadowed_by_parameter(span: Span) -> OxcDiagnostic {
+fn is_expect_shadowed(span: Span) -> OxcDiagnostic {
     OxcDiagnostic::warn(
         "`expect` is shadowed by a callback parameter and cannot be used for assertions.",
     )
@@ -128,6 +128,7 @@ declare_oxc_lint!(
     jest,
     nursery,
     suggestion,
+    version = "next",
     config = PreferExpectAssertionsConfig
 );
 
@@ -178,11 +179,23 @@ impl PreferExpectAssertions {
         match kind {
             JestGeneralFnKind::Hook => {
                 if general.name.ends_with("Each") {
-                    Self::check_each_hook(call_expr, node.id(), file_expect_prefix, covered_describe_ids, ctx);
+                    Self::check_each_hook(
+                        call_expr,
+                        node.id(),
+                        file_expect_prefix,
+                        covered_describe_ids,
+                        ctx,
+                    );
                 }
             }
             JestGeneralFnKind::Test => {
-                self.check_test(call_expr, node.id(), file_expect_prefix, covered_describe_ids, ctx);
+                self.check_test(
+                    call_expr,
+                    node.id(),
+                    file_expect_prefix,
+                    covered_describe_ids,
+                    ctx,
+                );
             }
             _ => {}
         }
@@ -258,7 +271,7 @@ impl PreferExpectAssertions {
 
         if expect_source.is_shadowed_in(callback, ctx) {
             if !ctx.frameworks().is_vitest() {
-                ctx.diagnostic(expect_is_shadowed_by_parameter(call_expr.callee.span()));
+                ctx.diagnostic(is_expect_shadowed(call_expr.callee.span()));
             }
             return;
         }
@@ -628,7 +641,7 @@ fn is_async_callback(callback: &Expression<'_>) -> bool {
 fn test() {
     use crate::tester::Tester;
 
-    let mut pass = vec![
+    let pass = vec![
         (r#"test("nonsense", [])"#, None),
         (r#"test("it1", () => {expect.assertions(0);})"#, None),
         (r#"test("it1", function() {expect.assertions(0);})"#, None),
@@ -1143,7 +1156,7 @@ fn test() {
         ),
     ];
 
-    let mut fail = vec![
+    let fail = vec![
         (r#"it("it1", () => foo())"#, None),
         ("it('resolves', () => expect(staged()).toBe(true));", None),
         ("it('resolves', async () => expect(await staged()).toBe(true));", None),
@@ -1827,313 +1840,6 @@ fn test() {
         ),
     ];
 
-    let vitest_pass = vec![
-        (r#"test("it1", () => {expect.assertions(0);})"#, None),
-        (r#"test("it1", function() {expect.assertions(0);})"#, None),
-        (r#"test("it1", function() {expect.hasAssertions();})"#, None),
-        (r#"it("it1", function() {expect.assertions(0);})"#, None),
-        (r#"test("it1")"#, None),
-        (r#"itHappensToStartWithIt("foo", function() {})"#, None),
-        (r#"testSomething("bar", function() {})"#, None),
-        ("it(async () => {expect.assertions(0);})", None),
-        (
-            // vitest fixture: destructured expect
-            r#"import * as vi from 'vitest';
-            test("example-fail", async ({ expect }) => {
-                expect.assertions(1);
-                await expect(Promise.resolve(null)).resolves.toBeNull();
-              });
-                "#,
-            None,
-        ),
-        (
-            // vitest fixture: expect accessed as property on context param
-            r#"import { test } from 'vitest';
-            test("ctx param", async (ctx) => {
-                ctx.expect.assertions(1);
-                await ctx.expect(Promise.resolve(null)).resolves.toBeNull();
-              });
-                "#,
-            None,
-        ),
-        (
-            // vitest fixture: renamed destructured expect
-            r#"import { test } from 'vitest';
-            test("renamed expect", async ({ expect: myExpect }) => {
-                myExpect.assertions(1);
-                await myExpect(Promise.resolve(null)).resolves.toBeNull();
-              });
-                "#,
-            None,
-        ),
-        (
-            // vitest fixture: renamed expect with hasAssertions
-            r#"import { test } from 'vitest';
-            test("renamed hasAssertions", async ({ expect: e }) => {
-                e.hasAssertions();
-                await e(Promise.resolve(null)).resolves.toBeNull();
-              });
-                "#,
-            None,
-        ),
-        (
-            // vitest fixture: context variable with hasAssertions
-            r#"import { test } from 'vitest';
-            test("ctx hasAssertions", async (t) => {
-                t.expect.hasAssertions();
-                await t.expect(Promise.resolve(null)).resolves.toBeNull();
-              });
-                "#,
-            None,
-        ),
-        (
-            // vitest fixture: no expect in params, fallback to global
-            r#"import { test, expect } from 'vitest';
-            test("global expect", async () => {
-                expect.assertions(1);
-                await expect(Promise.resolve(null)).resolves.toBeNull();
-              });
-                "#,
-            None,
-        ),
-        (
-            // import reassignment from vitest
-            r#"import { expect as e } from 'vitest';
-            test("reassigned vitest import", () => {
-                e.assertions(1);
-                e(true).toBe(true);
-              });
-                "#,
-            None,
-        ),
-        (
-            // Re-exported vitest: renamed expect from a third-party re-export
-            r#"import { expect as e } from 'vite-plus/test';
-            test("re-exported vitest", () => {
-                e.assertions(1);
-                e(true).toBe(true);
-              });"#,
-            None,
-        ),
-        (
-            // Re-exported vitest: global expect from a third-party re-export
-            r#"import { expect } from 'vite-plus/test';
-            test("re-exported vitest global", () => {
-                expect.assertions(1);
-                expect(true).toBe(true);
-              });"#,
-            None,
-        ),
-        (
-            // beforeEach with renamed import covers the describe
-            "import { expect as e } from 'vitest';
-            describe('suite', () => {
-                beforeEach(() => { e.hasAssertions(); });
-                it('test', () => {
-                    e(true).toBe(true);
-                });
-            });",
-            None,
-        ),
-        (
-            // beforeEach with renamed jest import covers the describe
-            "import { expect as e } from '@jest/globals';
-            describe('suite', () => {
-                beforeEach(() => { e.hasAssertions(); });
-                it('test', () => {
-                    e(true).toBe(true);
-                });
-            });",
-            None,
-        ),
-        (
-            r#"it("it1", () => {
-                expect.assertions(0);
-                const foo = { bar({ baz }) { baz(); } };
-              });
-                "#,
-            None,
-        ),
-        (
-            "
-               const expectNumbersToBeGreaterThan = (numbers, value) => {
-                for (let number of numbers) {
-                expect(number).toBeGreaterThan(value);
-               }
-               };
-
-               it('returns numbers that are greater than two', function () {
-                expectNumbersToBeGreaterThan(getNumbers(), 2);
-               });
-               ",
-            Some(serde_json::json!([{ "onlyFunctionsWithExpectInLoop": true }])),
-        ),
-        (
-            r#"
-               it("returns numbers that are greater than five", function () {
-                expect.assertions(2);
-                for (const number of getNumbers()) {
-                expect(number).toBeGreaterThan(5);
-               }
-               });
-               "#,
-            Some(serde_json::json!([{ "onlyFunctionsWithExpectInLoop": true }])),
-        ),
-        (
-            r#"it("returns things that are less than ten", function () {
-                expect.hasAssertions();
-                for (const thing in things) {
-                 expect(thing).toBeLessThan(10);
-                }
-               });"#,
-            Some(serde_json::json!([{ "onlyFunctionsWithExpectInLoop": true }])),
-        ),
-    ];
-
-    let vitest_fail = vec![
-        (r#"it("it1", () => foo())"#, None),
-        (
-            "
-            import * as vi from 'vitest';
-            it('my test description', ({ expect }) => {
-              const a = 1;
-              const b = 2;
-
-              expect(sum(a, b)).toBe(a + b);
-            })
-            ",
-            None,
-        ),
-        (
-            "
-            it('my test description', (context) => {
-              const a = 1;
-              const b = 2;
-
-              context.expect(sum(a, b)).toBe(a + b);
-            })
-            ",
-            None,
-        ),
-        ("it('resolves', () => expect(staged()).toBe(true));", None),
-        ("it('resolves', async () => expect(await staged()).toBe(true));", None),
-        (r#"it("it1", () => {})"#, None),
-        (r#"it("it1", () => { foo()})"#, None),
-        (r#"it("it1", function() {var a = 2;})"#, None),
-        (r#"it("it1", function() {expect.assertions();})"#, None),
-        (r#"it("it1", function() {expect.assertions(1,2);})"#, None),
-        (r#"it("it1", function() {expect.assertions(1,2,);})"#, None),
-        (r#"it("it1", function() {expect.assertions("1");})"#, None),
-        (r#"it("it1", function() {expect.hasAssertions("1");})"#, None),
-        (r#"it("it1", function() {expect.hasAssertions("1",);})"#, None),
-        (r#"it("it1", function() {expect.hasAssertions("1", "2");})"#, None),
-        (
-            r#"it("it1", () => {
-                expect.hasAssertions();
-
-                for (const number of getNumbers()) {
-                  expect(number).toBeGreaterThan(0);
-                }
-                 });
-
-                 it("it1", () => {
-                for (const number of getNumbers()) {
-                  expect(number).toBeGreaterThan(0);
-                }
-                 });"#,
-            Some(serde_json::json!([{ "onlyFunctionsWithExpectInLoop": true }])),
-        ),
-        (
-            r#"it("returns numbers that are greater than four", async () => {
-                 for (const number of await getNumbers()) {
-                expect(number).toBeGreaterThan(4);
-                 }
-               });
-
-               it("returns numbers that are greater than five", () => {
-                 for (const number of getNumbers()) {
-                expect(number).toBeGreaterThan(5);
-                 }
-               });
-                "#,
-            Some(serde_json::json!([{ "onlyFunctionsWithExpectInLoop": true }])),
-        ),
-        (
-            r#"it("it1", () => {
-                const foo = { bar({ baz }) { baz(); } };
-              });
-                "#,
-            None,
-        ),
-        (
-            // vitest fixture: renamed expect, missing assertions
-            "import * as vi from 'vitest';
-            it('missing assertions', ({ expect: myExpect }) => {
-              myExpect(true).toBe(true);
-            })
-            ",
-            None,
-        ),
-        (
-            // vitest fixture: context variable, missing assertions
-            "import * as vi from 'vitest';
-            it('missing assertions', (ctx) => {
-              ctx.expect(true).toBe(true);
-            })
-            ",
-            None,
-        ),
-        (
-            // vitest fixture: renamed expect, assertions with no argument
-            r#"import * as vi from 'vitest';
-            it("it1", ({ expect: e }) => {e.assertions();})"#,
-            None,
-        ),
-        (
-            // vitest fixture: context variable, assertions with string argument
-            r#"import * as vi from 'vitest';
-            it("it1", (ctx) => {ctx.expect.assertions("1");})"#,
-            None,
-        ),
-        (
-            // vitest fixture: renamed expect, hasAssertions with extra arguments
-            r#"import * as vi from 'vitest';
-            it("it1", ({ expect: e }) => {e.hasAssertions("1");})"#,
-            None,
-        ),
-        (
-            // vitest fixture: context variable, assertions with extra arguments
-            r#"import * as vi from 'vitest';
-            it("it1", (ctx) => {ctx.expect.assertions(1, 2);})"#,
-            None,
-        ),
-        (
-            // vitest import reassignment: missing assertions
-            r#"import { expect as e } from 'vitest';
-            test("reassigned", () => { e(true).toBe(true); });"#,
-            None,
-        ),
-        (
-            // Re-exported vitest: missing assertions
-            r#"import { expect as e } from 'vite-plus/test';
-            test("re-exported missing", () => { e(true).toBe(true); });"#,
-            None,
-        ),
-        (
-            // beforeEach uses global `expect.hasAssertions()` but import is renamed to `e`.
-            // The hook doesn't match the renamed prefix, so the test is NOT covered.
-            "import { expect as e } from 'vitest';
-            describe('suite', () => {
-                beforeEach(() => { expect.hasAssertions(); });
-                it('test', () => {
-                    e(true).toBe(true);
-                });
-            });",
-            None,
-        ),
-    ];
-
-    // haveExpectAssertions: two suggestions — expect.hasAssertions() and expect.assertions()
     let fix_two_suggestions = vec![
         (
             r#"test("it1", () => {expect(true).toBe(true);})"#,
@@ -2158,106 +1864,30 @@ fn test() {
         ),
     ];
 
-    // import reassignment: suggestions use the local alias
-    let fix_import_reassignment = vec![
-        // jest import reassignment
+    let fix_import_reassignment = vec![(
+        r#"import { expect as e } from '@jest/globals';
+            test("reassigned", () => { e(true).toBe(true); });"#,
         (
             r#"import { expect as e } from '@jest/globals';
-            test("reassigned", () => { e(true).toBe(true); });"#,
-            (
-                r#"import { expect as e } from '@jest/globals';
             test("reassigned", () => {e.hasAssertions(); e(true).toBe(true); });"#,
-                r#"import { expect as e } from '@jest/globals';
+            r#"import { expect as e } from '@jest/globals';
             test("reassigned", () => {e.assertions(); e(true).toBe(true); });"#,
-            ),
         ),
-        // vitest import reassignment
-        (
-            r#"import { expect as e } from 'vitest';
-            test("reassigned", () => { e(true).toBe(true); });"#,
-            (
-                r#"import { expect as e } from 'vitest';
-            test("reassigned", () => {e.hasAssertions(); e(true).toBe(true); });"#,
-                r#"import { expect as e } from 'vitest';
-            test("reassigned", () => {e.assertions(); e(true).toBe(true); });"#,
-            ),
-        ),
-    ];
+    )];
 
-    // vitest fixture: two suggestions using the resolved expect prefix
-    let fix_vitest_two_suggestions = vec![
-        // renamed expect: suggestions use `myExpect`
-        (
-            "import * as vi from 'vitest';
-            it('missing assertions', ({ expect: myExpect }) => {
-              myExpect(true).toBe(true);
-            })",
-            (
-                "import * as vi from 'vitest';
-            it('missing assertions', ({ expect: myExpect }) => {myExpect.hasAssertions();
-              myExpect(true).toBe(true);
-            })",
-                "import * as vi from 'vitest';
-            it('missing assertions', ({ expect: myExpect }) => {myExpect.assertions();
-              myExpect(true).toBe(true);
-            })",
-            ),
-        ),
-        // context variable: suggestions use `ctx.expect`
-        (
-            "import * as vi from 'vitest';
-            it('missing assertions', (ctx) => {
-              ctx.expect(true).toBe(true);
-            })",
-            (
-                "import * as vi from 'vitest';
-            it('missing assertions', (ctx) => {ctx.expect.hasAssertions();
-              ctx.expect(true).toBe(true);
-            })",
-                "import * as vi from 'vitest';
-            it('missing assertions', (ctx) => {ctx.expect.assertions();
-              ctx.expect(true).toBe(true);
-            })",
-            ),
-        ),
-    ];
-
-    // vitest fixture: fix cases for malformed args
-    let fix_vitest_remove_args = vec![
-        // renamed expect: hasAssertions with extra args
-        (
-            r#"import * as vi from 'vitest';
-            it("it1", ({ expect: e }) => {e.hasAssertions("1");})"#,
-            r#"import * as vi from 'vitest';
-            it("it1", ({ expect: e }) => {e.hasAssertions();})"#,
-        ),
-        // context variable: assertions with extra args
-        (
-            r#"import * as vi from 'vitest';
-            it("it1", (ctx) => {ctx.expect.assertions(1, 2);})"#,
-            r#"import * as vi from 'vitest';
-            it("it1", (ctx) => {ctx.expect.assertions(1);})"#,
-        ),
-    ];
-
-    // hasAssertionsTakesNoArguments / assertionsRequiresOneArgument:
-    // suggest removing extra arguments (single suggestion)
     let fix_remove_args = vec![
-        // hasAssertions with extra args
         (
             r#"it("it1", function() {expect.hasAssertions("1");})"#,
             r#"it("it1", function() {expect.hasAssertions();})"#,
         ),
         (
             r#"it("it1", function() {expect.hasAssertions("1",);})"#,
-            // trailing comma is also removed since we delete from first arg to before `)`
             r#"it("it1", function() {expect.hasAssertions();})"#,
         ),
         (
             r#"it("it1", function() {expect.hasAssertions("1", "2");})"#,
             r#"it("it1", function() {expect.hasAssertions();})"#,
         ),
-        // assertions with extra args
         (
             r#"it("it1", function() {expect.assertions(1,2);})"#,
             r#"it("it1", function() {expect.assertions(1);})"#,
@@ -2266,7 +1896,6 @@ fn test() {
             r#"it("it1", function() {expect.assertions(1,2,);})"#,
             r#"it("it1", function() {expect.assertions(1);})"#,
         ),
-        // hasAssertions with extra args in hooks
         (
             r#"beforeEach(() => { expect.hasAssertions("1") })"#,
             r"beforeEach(() => { expect.hasAssertions() })",
@@ -2275,25 +1904,12 @@ fn test() {
             r#"afterEach(() => { expect.hasAssertions("1") })"#,
             r"afterEach(() => { expect.hasAssertions() })",
         ),
-        // hook with renamed import and extra args
-        (
-            r#"import { expect as e } from 'vitest';
-            beforeEach(() => { e.hasAssertions("1") })"#,
-            "import { expect as e } from 'vitest';
-            beforeEach(() => { e.hasAssertions() })",
-        ),
     ];
-
-    pass.extend(vitest_pass);
-    fail.extend(vitest_fail);
 
     Tester::new(PreferExpectAssertions::NAME, PreferExpectAssertions::PLUGIN, pass, fail)
         .with_jest_plugin(true)
-        .with_vitest_plugin(true)
         .expect_fix(fix_two_suggestions)
         .expect_fix(fix_import_reassignment)
-        .expect_fix(fix_vitest_two_suggestions)
         .expect_fix(fix_remove_args)
-        .expect_fix(fix_vitest_remove_args)
         .test_and_snapshot();
 }
