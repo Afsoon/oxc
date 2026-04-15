@@ -2,14 +2,14 @@
 source: crates/oxc_linter/src/tester.rs
 ---
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:1:1]
  1 │ it("it1", () => foo())
    · ──────────────────────
    ╰────
-  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in the test.
+  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in this test.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:3:13]
  2 │                 import * as vi from 'vitest';
  3 │ ╭─▶             it('my test description', ({ expect }) => {
@@ -20,9 +20,9 @@ source: crates/oxc_linter/src/tester.rs
  8 │ ╰─▶             })
  9 │                 
    ╰────
-  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in the test.
+  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in this test.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `context.expect.assertions(<number of assertions>)` or `context.expect.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:2:13]
  1 │     
  2 │ ╭─▶             it('my test description', (context) => {
@@ -33,42 +33,42 @@ source: crates/oxc_linter/src/tester.rs
  7 │ ╰─▶             })
  8 │                 
    ╰────
-  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in the test.
+  help: Add `context.expect.hasAssertions()` or `context.expect.assertions(<number>)` as the first statement in this test.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:1:1]
  1 │ it('resolves', () => expect(staged()).toBe(true));
    · ─────────────────────────────────────────────────
    ╰────
-  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in the test.
+  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in this test.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:1:1]
  1 │ it('resolves', async () => expect(await staged()).toBe(true));
    · ─────────────────────────────────────────────────────────────
    ╰────
-  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in the test.
+  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in this test.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:1:1]
  1 │ it("it1", () => {})
    · ───────────────────
    ╰────
-  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in the test.
+  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in this test.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:1:1]
  1 │ it("it1", () => { foo()})
    · ─────────────────────────
    ╰────
-  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in the test.
+  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in this test.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:1:1]
  1 │ it("it1", function() {var a = 2;})
    · ──────────────────────────────────
    ╰────
-  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in the test.
+  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in this test.
 
   ⚠ eslint-plugin-vitest(prefer-expect-assertions): `expect.assertions` expects a single argument of type number.
    ╭─[prefer_expect_assertions.tsx:1:23]
@@ -119,7 +119,7 @@ source: crates/oxc_linter/src/tester.rs
    ╰────
   help: Remove the arguments from `expect.hasAssertions()`.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
     ╭─[prefer_expect_assertions.tsx:9:18]
   8 │     
   9 │ ╭─▶                  it("it1", () => {
@@ -128,9 +128,9 @@ source: crates/oxc_linter/src/tester.rs
  12 │ │                   }
  13 │ ╰─▶                  });
     ╰────
-  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in the test.
+  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in this test.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:1:1]
  1 │ ╭─▶ it("returns numbers that are greater than four", async () => {
  2 │ │                    for (const number of await getNumbers()) {
@@ -139,9 +139,9 @@ source: crates/oxc_linter/src/tester.rs
  5 │ ╰─▶                });
  6 │     
    ╰────
-  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in the test.
+  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in this test.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
     ╭─[prefer_expect_assertions.tsx:7:16]
   6 │     
   7 │ ╭─▶                it("returns numbers that are greater than five", () => {
@@ -151,18 +151,18 @@ source: crates/oxc_linter/src/tester.rs
  11 │ ╰─▶                });
  12 │                     
     ╰────
-  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in the test.
+  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in this test.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `expect.assertions(<number of assertions>)` or `expect.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:1:1]
  1 │ ╭─▶ it("it1", () => {
  2 │ │                   const foo = { bar({ baz }) { baz(); } };
  3 │ ╰─▶               });
  4 │                     
    ╰────
-  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in the test.
+  help: Add `expect.hasAssertions()` or `expect.assertions(<number>)` as the first statement in this test.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `myExpect.assertions(<number of assertions>)` or `myExpect.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `myExpect.assertions(<number of assertions>)` or `myExpect.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:2:13]
  1 │     import * as vi from 'vitest';
  2 │ ╭─▶             it('missing assertions', ({ expect: myExpect }) => {
@@ -170,9 +170,9 @@ source: crates/oxc_linter/src/tester.rs
  4 │ ╰─▶             })
  5 │                 
    ╰────
-  help: Add `myExpect.hasAssertions()` or `myExpect.assertions(<number>)` as the first statement in the test.
+  help: Add `myExpect.hasAssertions()` or `myExpect.assertions(<number>)` as the first statement in this test.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `ctx.expect.assertions(<number of assertions>)` or `ctx.expect.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `ctx.expect.assertions(<number of assertions>)` or `ctx.expect.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:2:13]
  1 │     import * as vi from 'vitest';
  2 │ ╭─▶             it('missing assertions', (ctx) => {
@@ -180,7 +180,7 @@ source: crates/oxc_linter/src/tester.rs
  4 │ ╰─▶             })
  5 │                 
    ╰────
-  help: Add `ctx.expect.hasAssertions()` or `ctx.expect.assertions(<number>)` as the first statement in the test.
+  help: Add `ctx.expect.hasAssertions()` or `ctx.expect.assertions(<number>)` as the first statement in this test.
 
   ⚠ eslint-plugin-vitest(prefer-expect-assertions): `e.assertions` expects a single argument of type number.
    ╭─[prefer_expect_assertions.tsx:2:43]
@@ -214,23 +214,23 @@ source: crates/oxc_linter/src/tester.rs
    ╰────
   help: Pass a single numeric argument to `ctx.expect.assertions()`.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `e.assertions(<number of assertions>)` or `e.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `e.assertions(<number of assertions>)` or `e.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:2:13]
  1 │ import { expect as e } from 'vitest';
  2 │             test("reassigned", () => { e(true).toBe(true); });
    ·             ─────────────────────────────────────────────────
    ╰────
-  help: Add `e.hasAssertions()` or `e.assertions(<number>)` as the first statement in the test.
+  help: Add `e.hasAssertions()` or `e.assertions(<number>)` as the first statement in this test.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `e.assertions(<number of assertions>)` or `e.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `e.assertions(<number of assertions>)` or `e.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:2:13]
  1 │ import { expect as e } from 'vite-plus/test';
  2 │             test("re-exported missing", () => { e(true).toBe(true); });
    ·             ──────────────────────────────────────────────────────────
    ╰────
-  help: Add `e.hasAssertions()` or `e.assertions(<number>)` as the first statement in the test.
+  help: Add `e.hasAssertions()` or `e.assertions(<number>)` as the first statement in this test.
 
-  ⚠ eslint-plugin-vitest(prefer-expect-assertions): Every test should have either `e.assertions(<number of assertions>)` or `e.hasAssertions()` as its first expression.
+  ⚠ eslint-plugin-vitest(prefer-expect-assertions): This test should have either `e.assertions(<number of assertions>)` or `e.hasAssertions()` as its first expression.
    ╭─[prefer_expect_assertions.tsx:4:17]
  3 │                     beforeEach(() => { expect.hasAssertions(); });
  4 │ ╭─▶                 it('test', () => {
@@ -238,4 +238,4 @@ source: crates/oxc_linter/src/tester.rs
  6 │ ╰─▶                 });
  7 │                 });
    ╰────
-  help: Add `e.hasAssertions()` or `e.assertions(<number>)` as the first statement in the test.
+  help: Add `e.hasAssertions()` or `e.assertions(<number>)` as the first statement in this test.
