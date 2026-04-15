@@ -85,10 +85,10 @@ pub fn resolve_expect_local_name(ctx: &LintContext<'_>, sources: &[&str]) -> Com
 }
 
 pub trait PreferExpectAssertionsRuleImpl {
-    fn check_node<'a, 'r>(
+    fn check_node<'a>(
         &self,
         jest_node: &PossibleJestNode<'a, '_>,
-        file_expect_prefix: &'r str,
+        file_expect_prefix: &str,
         covered_describe_ids: &mut Vec<NodeId>,
         ctx: &LintContext<'a>,
     ) {
@@ -172,11 +172,11 @@ pub trait PreferExpectAssertionsRuleImpl {
         }
     }
 
-    fn check_test<'a, 'r>(
+    fn check_test<'a>(
         &self,
         call_expr: &'a CallExpression<'a>,
         test_node_id: NodeId,
-        file_expect_prefix: &'r str,
+        file_expect_prefix: &str,
         covered_describe_ids: &[NodeId],
         ctx: &LintContext<'a>,
     ) {
@@ -254,12 +254,12 @@ pub trait PreferExpectAssertionsRuleImpl {
         file_expect_prefix: &'r str,
         ctx: &LintContext<'a>,
     ) -> Option<Cow<'r, str>>;
-    fn report_have_expect_assertions<'a>(
+    fn report_have_expect_assertions(
         &self,
         span: Span,
         prefix: &str,
         suggestions: [RuleFix; 2],
-        ctx: &LintContext<'a>,
+        ctx: &LintContext<'_>,
     );
 
     fn should_check_node(&self, body: &FunctionBody<'_>, is_async: bool, prefix: &str) -> bool;

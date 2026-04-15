@@ -114,12 +114,12 @@ impl PreferExpectAssertionsRuleImpl for PreferExpectAssertions {
         Some(Cow::Borrowed(file_expect_prefix))
     }
 
-    fn report_have_expect_assertions<'a>(
+    fn report_have_expect_assertions(
         &self,
         span: Span,
         prefix: &str,
         suggestions: [RuleFix; 2],
-        ctx: &LintContext<'a>,
+        ctx: &LintContext<'_>,
     ) {
         ctx.diagnostic_with_suggestions(have_expect_assertions(span, prefix), suggestions);
     }

@@ -65,7 +65,7 @@ declare_oxc_lint!(
     version = "next",
 );
 
-impl<'a> Rule for PreferExpectAssertions {
+impl Rule for PreferExpectAssertions {
     fn from_configuration(value: serde_json::Value) -> Result<Self, serde_json::error::Error> {
         serde_json::from_value::<DefaultRuleConfig<PreferExpectAssertionsConfig>>(value)
             .map(|c| Self(Box::new(c.into_inner())))
@@ -106,12 +106,12 @@ impl PreferExpectAssertionsRuleImpl for PreferExpectAssertions {
         Some(Cow::Owned(expect_param.to_string()))
     }
 
-    fn report_have_expect_assertions<'a>(
+    fn report_have_expect_assertions(
         &self,
         span: Span,
         prefix: &str,
         suggestions: [RuleFix; 2],
-        ctx: &LintContext<'a>,
+        ctx: &LintContext<'_>,
     ) {
         ctx.diagnostic_with_suggestions(have_expect_assertions(span, prefix), suggestions);
     }
@@ -131,7 +131,7 @@ fn resolve_expect_parameter_prefix(callback: &Expression<'_>) -> Option<CompactS
         _ => return None,
     };
 
-    let Some(first_param) = params.items.first() else { return None };
+    let first_param = params.items.first()?;
 
     match &first_param.pattern {
         // `(ctx) => {}` → expect accessed via `ctx.expect`
