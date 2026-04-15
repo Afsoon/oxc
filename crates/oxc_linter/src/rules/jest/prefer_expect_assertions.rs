@@ -1,6 +1,6 @@
 use oxc_ast::{
     AstKind,
-    ast::{Argument, BindingPattern, CallExpression, Expression, FunctionBody, Statement},
+    ast::{Argument, CallExpression, Expression, FunctionBody, Statement},
 };
 use oxc_ast_visit::Visit;
 use oxc_diagnostics::OxcDiagnostic;
@@ -21,29 +21,12 @@ use crate::{
     },
 };
 
-enum ExpectSource<'a> {
-    /// Global or import — borrows the file-level prefix (e.g. `"expect"` or `"e"`).
-    Global(&'a str),
-    /// Vitest fixture arg — owns the prefix (e.g. `"myExpect"`, `"ctx.expect"`).
-    Fixture(CompactStr),
+fn is_expect_shadowed_in(callback: &Expression<'_>, ctx: &LintContext<'_>) -> bool {
+    callback_scope_id(callback)
+        .is_some_and(|id| ctx.scoping().get_binding(id, "expect".into()).is_some())
 }
 
-impl ExpectSource<'_> {
-    fn prefix(&self) -> &str {
-        match self {
-            Self::Global(s) => s,
-            Self::Fixture(s) => s.as_str(),
-        }
-    }
-
-    fn is_shadowed_in(&self, callback: &Expression<'_>, ctx: &LintContext<'_>) -> bool {
-        matches!(self, Self::Global(_))
-            && callback_scope_id(callback)
-                .is_some_and(|id| ctx.scoping().get_binding(id, "expect".into()).is_some())
-    }
-}
-
-fn is_expect_shadowed(span: Span) -> OxcDiagnostic {
+fn expect_shadowed_by_parameter(span: Span) -> OxcDiagnostic {
     OxcDiagnostic::warn(
         "`expect` is shadowed by a callback parameter and cannot be used for assertions.",
     )
@@ -267,26 +250,20 @@ impl PreferExpectAssertions {
             return;
         }
 
-        let expect_source = resolve_expect_source(callback, file_expect_prefix.as_str(), ctx);
-
-        if expect_source.is_shadowed_in(callback, ctx) {
-            if !ctx.frameworks().is_vitest() {
-                ctx.diagnostic(is_expect_shadowed(call_expr.callee.span()));
-            }
+        if is_expect_shadowed_in(callback, ctx) {
+            ctx.diagnostic(expect_shadowed_by_parameter(call_expr.callee.span()));
             return;
         }
 
-        if self.has_options()
-            && !self.should_check(body, is_async_callback(callback), expect_source.prefix())
-        {
+        let prefix = file_expect_prefix.as_str();
+
+        if self.has_options() && !self.should_check(body, is_async_callback(callback), prefix) {
             return;
         }
 
-        if Self::check_first_statement(body, &expect_source, ctx) {
+        if Self::check_first_statement(body, prefix, ctx) {
             return;
         }
-
-        let prefix = expect_source.prefix();
         let insert_pos = Span::new(body.span.start + 1, body.span.start + 1);
         let fixer = RuleFixer::new(FixKind::Suggestion, ctx);
         let suggestions = [
@@ -310,11 +287,7 @@ impl PreferExpectAssertions {
             || self.only_functions_with_expect_in_loop
     }
 
-    fn check_first_statement(
-        body: &FunctionBody<'_>,
-        expect_source: &ExpectSource<'_>,
-        ctx: &LintContext<'_>,
-    ) -> bool {
+    fn check_first_statement(body: &FunctionBody<'_>, prefix: &str, ctx: &LintContext<'_>) -> bool {
         let Some(Statement::ExpressionStatement(first_expr_stmt)) = body.statements.first() else {
             return false;
         };
@@ -324,7 +297,6 @@ impl PreferExpectAssertions {
         };
 
         let name = get_node_name(&first_call.callee);
-        let prefix = expect_source.prefix();
 
         if name.ends_with("hasAssertions") {
             validate_has_assertions_args(first_call, prefix, ctx);
@@ -561,59 +533,10 @@ fn callback_body<'a>(callback: &'a Expression<'a>) -> Option<&'a FunctionBody<'a
     }
 }
 
-fn resolve_expect_source<'p>(
-    callback: &Expression<'_>,
-    file_expect_prefix: &'p str,
-    ctx: &LintContext<'_>,
-) -> ExpectSource<'p> {
-    if let Some(source) = resolve_expect_from_fixture_param(callback, ctx.frameworks().is_vitest())
-    {
-        return source;
-    }
-
-    ExpectSource::Global(file_expect_prefix)
-}
-
-fn resolve_expect_from_fixture_param<'p>(
-    callback: &Expression<'_>,
-    is_vitest: bool,
-) -> Option<ExpectSource<'p>> {
-    if !is_vitest {
-        return None;
-    }
-
-    let params = match callback {
-        Expression::FunctionExpression(func) => &func.params,
-        Expression::ArrowFunctionExpression(func) => &func.params,
-        _ => return None,
-    };
-
-    let first_param = params.items.first()?;
-
-    match &first_param.pattern {
-        BindingPattern::BindingIdentifier(id) => {
-            Some(ExpectSource::Fixture(CompactStr::from(format!("{}.expect", id.name))))
-        }
-        BindingPattern::ObjectPattern(pattern) => {
-            let prop = pattern
-                .properties
-                .iter()
-                .find(|p| p.key.static_name().is_some_and(|name| name == "expect"))?;
-
-            let local_name = match &prop.value {
-                BindingPattern::BindingIdentifier(id) => id.name.as_str(),
-                _ => "expect",
-            };
-            Some(ExpectSource::Fixture(CompactStr::from(local_name)))
-        }
-        _ => None,
-    }
-}
-
 fn resolve_expect_local_name(ctx: &LintContext<'_>) -> CompactStr {
     for entry in &ctx.module_record().import_entries {
         let source = entry.module_request.name();
-        if source != "@jest/globals" && source != "vitest" && source != "vite-plus/test" {
+        if source != "@jest/globals" {
             continue;
         }
         if entry.is_type {
