@@ -635,6 +635,26 @@ Here's an example if you're using Next.js in a monorepo:
 ```
 
 
+### settings.jest
+
+type: `object`
+
+
+Configure Jest plugin rules.
+
+See [eslint-plugin-jest](https://github.com/jest-community/eslint-plugin-jest)'s
+configuration for a full reference.
+
+
+#### settings.jest.version
+
+type: `integer`
+
+default: `29`
+
+
+
+
 ### settings.jsdoc
 
 type: `object`
