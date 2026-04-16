@@ -514,13 +514,15 @@ fn test() {
     )];
 
     let fix_two_suggestions = vec![
+        // OG: empty body
         (
-            r#"test("it1", () => {expect(true).toBe(true);})"#,
+            r#"it("it1", () => {})"#,
             (
-                r#"test("it1", () => {expect.hasAssertions();expect(true).toBe(true);})"#,
-                r#"test("it1", () => {expect.assertions();expect(true).toBe(true);})"#,
+                r#"it("it1", () => {expect.hasAssertions();})"#,
+                r#"it("it1", () => {expect.assertions();})"#,
             ),
         ),
+        // OG: single statement
         (
             r#"it("it1", () => { foo()})"#,
             (
@@ -528,6 +530,7 @@ fn test() {
                 r#"it("it1", () => {expect.assertions(); foo()})"#,
             ),
         ),
+        // OG: var declaration
         (
             r#"it("it1", function() {var a = 2;})"#,
             (
@@ -535,6 +538,95 @@ fn test() {
                 r#"it("it1", function() {expect.assertions();var a = 2;})"#,
             ),
         ),
+        // OG: test() variant
+        (
+            r#"test("it1", () => {expect(true).toBe(true);})"#,
+            (
+                r#"test("it1", () => {expect.hasAssertions();expect(true).toBe(true);})"#,
+                r#"test("it1", () => {expect.assertions();expect(true).toBe(true);})"#,
+            ),
+        ),
+        // OG: multi-statement body
+        (
+            r#"it("it1", function() {
+              someFunctionToDo();
+              someFunctionToDo2();
+            });"#,
+            (
+                r#"it("it1", function() {expect.hasAssertions();
+              someFunctionToDo();
+              someFunctionToDo2();
+            });"#,
+                r#"it("it1", function() {expect.assertions();
+              someFunctionToDo();
+              someFunctionToDo2();
+            });"#,
+            ),
+        ),
+        // OG: object destructuring in body (not a fixture param)
+        (
+            r#"it("it1", () => {
+                const foo = { bar({ baz }) { baz(); } };
+              });"#,
+            (
+                r#"it("it1", () => {expect.hasAssertions();
+                const foo = { bar({ baz }) { baz(); } };
+              });"#,
+                r#"it("it1", () => {expect.assertions();
+                const foo = { bar({ baz }) { baz(); } };
+              });"#,
+            ),
+        ),
+        // Vitest fixture: destructured expect
+        (
+            "import * as vi from 'vitest';
+            it('my test description', ({ expect }) => {
+              const a = 1;
+              const b = 2;
+
+              expect(sum(a, b)).toBe(a + b);
+            })",
+            (
+                "import * as vi from 'vitest';
+            it('my test description', ({ expect }) => {expect.hasAssertions();
+              const a = 1;
+              const b = 2;
+
+              expect(sum(a, b)).toBe(a + b);
+            })",
+                "import * as vi from 'vitest';
+            it('my test description', ({ expect }) => {expect.assertions();
+              const a = 1;
+              const b = 2;
+
+              expect(sum(a, b)).toBe(a + b);
+            })",
+            ),
+        ),
+        // Vitest fixture: context variable
+        (
+            "it('my test description', (context) => {
+              const a = 1;
+              const b = 2;
+
+              context.expect(sum(a, b)).toBe(a + b);
+            })",
+            (
+                "it('my test description', (context) => {context.expect.hasAssertions();
+              const a = 1;
+              const b = 2;
+
+              context.expect(sum(a, b)).toBe(a + b);
+            })",
+                "it('my test description', (context) => {context.expect.assertions();
+              const a = 1;
+              const b = 2;
+
+              context.expect(sum(a, b)).toBe(a + b);
+            })",
+            ),
+        ),
+        // Vitest fixture: renamed expect
         (
             "import * as vi from 'vitest';
             it('missing assertions', ({ expect: myExpect }) => {
@@ -551,6 +643,7 @@ fn test() {
             })",
             ),
         ),
+        // Vitest fixture: context variable shorthand
         (
             "import * as vi from 'vitest';
             it('missing assertions', (ctx) => {
@@ -568,6 +661,48 @@ fn test() {
             ),
         ),
     ];
+
+    // These fix cases require config options but `ExpectFixTestCase` doesn't support
+    // `(S, (S, S), Option<Value>)` — the two-suggestion format with config.
+    //
+    // onlyFunctionsWithExpectInLoop (OG case 11):
+    // (
+    //     r#"it("it1", () => {
+    //         expect.hasAssertions();
+    //         for (const number of getNumbers()) {
+    //           expect(number).toBeGreaterThan(0);
+    //         }
+    //       });
+    //       it("it1", () => {
+    //         for (const number of getNumbers()) {
+    //           expect(number).toBeGreaterThan(0);
+    //         }
+    //       });"#,
+    //     (
+    //         // adds expect.hasAssertions(); to second test only
+    //         // adds expect.assertions(); to second test only
+    //     ),
+    //     Some(serde_json::json!([{ "onlyFunctionsWithExpectInLoop": true }])),
+    // ),
+    //
+    // onlyFunctionsWithExpectInLoop (OG case 12):
+    // (
+    //     r#"it("returns numbers > 4", async () => {
+    //         for (const number of await getNumbers()) {
+    //           expect(number).toBeGreaterThan(4);
+    //         }
+    //       });
+    //       it("returns numbers > 5", () => {
+    //         for (const number of getNumbers()) {
+    //           expect(number).toBeGreaterThan(5);
+    //         }
+    //       });"#,
+    //     (
+    //         // adds expect.hasAssertions(); to both tests
+    //         // adds expect.assertions(); to both tests
+    //     ),
+    //     Some(serde_json::json!([{ "onlyFunctionsWithExpectInLoop": true }])),
+    // ),
 
     let fix_remove_args = vec![
         (

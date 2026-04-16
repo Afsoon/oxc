@@ -1411,13 +1411,15 @@ fn test() {
     ];
 
     let fix_two_suggestions = vec![
+        // OG test 1: empty body
         (
-            r#"test("it1", () => {expect(true).toBe(true);})"#,
+            r#"it("it1", () => {})"#,
             (
-                r#"test("it1", () => {expect.hasAssertions();expect(true).toBe(true);})"#,
-                r#"test("it1", () => {expect.assertions();expect(true).toBe(true);})"#,
+                r#"it("it1", () => {expect.hasAssertions();})"#,
+                r#"it("it1", () => {expect.assertions();})"#,
             ),
         ),
+        // OG test 2: single statement
         (
             r#"it("it1", () => { foo()})"#,
             (
@@ -1425,11 +1427,20 @@ fn test() {
                 r#"it("it1", () => {expect.assertions(); foo()})"#,
             ),
         ),
+        // OG test 4: var declaration
         (
             r#"it("it1", function() {var a = 2;})"#,
             (
                 r#"it("it1", function() {expect.hasAssertions();var a = 2;})"#,
                 r#"it("it1", function() {expect.assertions();var a = 2;})"#,
+            ),
+        ),
+        // OG test 1 variant: test() instead of it()
+        (
+            r#"test("it1", () => {expect(true).toBe(true);})"#,
+            (
+                r#"test("it1", () => {expect.hasAssertions();expect(true).toBe(true);})"#,
+                r#"test("it1", () => {expect.assertions();expect(true).toBe(true);})"#,
             ),
         ),
     ];
@@ -1444,6 +1455,204 @@ fn test() {
             test("reassigned", () => {e.assertions(); e(true).toBe(true); });"#,
         ),
     )];
+
+    // Two suggestions for multi-statement function body and describe/hook interactions
+    let fix_multi_statement = vec![
+        // OG test 3: multi-statement body
+        (
+            r#"it("it1", function() {
+              someFunctionToDo();
+              someFunctionToDo2();
+            });"#,
+            (
+                r#"it("it1", function() {expect.hasAssertions();
+              someFunctionToDo();
+              someFunctionToDo2();
+            });"#,
+                r#"it("it1", function() {expect.assertions();
+              someFunctionToDo();
+              someFunctionToDo2();
+            });"#,
+            ),
+        ),
+        // OG test 15: test outside describe not covered by beforeEach inside describe
+        (
+            r#"it("it1", function() {
+              someFunctionToDo();
+              someFunctionToDo2();
+            });
+
+            describe('some tests', () => {
+              beforeEach(() => { expect.hasAssertions(); });
+              it("it1", function() {
+                someFunctionToDo();
+                someFunctionToDo2();
+              });
+            });"#,
+            (
+                r#"it("it1", function() {expect.hasAssertions();
+              someFunctionToDo();
+              someFunctionToDo2();
+            });
+
+            describe('some tests', () => {
+              beforeEach(() => { expect.hasAssertions(); });
+              it("it1", function() {
+                someFunctionToDo();
+                someFunctionToDo2();
+              });
+            });"#,
+                r#"it("it1", function() {expect.assertions();
+              someFunctionToDo();
+              someFunctionToDo2();
+            });
+
+            describe('some tests', () => {
+              beforeEach(() => { expect.hasAssertions(); });
+              it("it1", function() {
+                someFunctionToDo();
+                someFunctionToDo2();
+              });
+            });"#,
+            ),
+        ),
+        // OG test 18: test after describe not covered by beforeEach inside describe
+        (
+            r#"describe('some tests', () => {
+              beforeEach(() => { expect.hasAssertions(); });
+              it("it1", function() {
+                someFunctionToDo();
+                someFunctionToDo2();
+              });
+            });
+
+            it("it1", function() {
+              someFunctionToDo();
+              someFunctionToDo2();
+            });"#,
+            (
+                r#"describe('some tests', () => {
+              beforeEach(() => { expect.hasAssertions(); });
+              it("it1", function() {
+                someFunctionToDo();
+                someFunctionToDo2();
+              });
+            });
+
+            it("it1", function() {expect.hasAssertions();
+              someFunctionToDo();
+              someFunctionToDo2();
+            });"#,
+                r#"describe('some tests', () => {
+              beforeEach(() => { expect.hasAssertions(); });
+              it("it1", function() {
+                someFunctionToDo();
+                someFunctionToDo2();
+              });
+            });
+
+            it("it1", function() {expect.assertions();
+              someFunctionToDo();
+              someFunctionToDo2();
+            });"#,
+            ),
+        ),
+        // OG test 19: test in second describe not covered by beforeEach in first describe
+        (
+            r#"describe('some tests', () => {
+              beforeEach(() => { expect.hasAssertions(); });
+              it("it1", function() {
+                someFunctionToDo();
+                someFunctionToDo2();
+              });
+            });
+
+            describe('more tests', () => {
+              it("it1", function() {
+                someFunctionToDo();
+                someFunctionToDo2();
+              });
+            });"#,
+            (
+                r#"describe('some tests', () => {
+              beforeEach(() => { expect.hasAssertions(); });
+              it("it1", function() {
+                someFunctionToDo();
+                someFunctionToDo2();
+              });
+            });
+
+            describe('more tests', () => {
+              it("it1", function() {expect.hasAssertions();
+                someFunctionToDo();
+                someFunctionToDo2();
+              });
+            });"#,
+                r#"describe('some tests', () => {
+              beforeEach(() => { expect.hasAssertions(); });
+              it("it1", function() {
+                someFunctionToDo();
+                someFunctionToDo2();
+              });
+            });
+
+            describe('more tests', () => {
+              it("it1", function() {expect.assertions();
+                someFunctionToDo();
+                someFunctionToDo2();
+              });
+            });"#,
+            ),
+        ),
+    ];
+
+    // hasAssertions with callback arg — remove everything after hasAssertions
+    let fix_has_assertions_callback_arg = vec![(
+        r#"it("it1", function() {
+              expect.hasAssertions(() => {
+                someFunctionToDo();
+                someFunctionToDo2();
+              });
+            });"#,
+        r#"it("it1", function() {
+              expect.hasAssertions();
+            });"#,
+    )];
+
+    // These fix cases require config options but `ExpectFixTestCase` doesn't support
+    // `(S, (S, S), Option<Value>)` — the two-suggestion format with config.
+    // The options only control WHETHER the diagnostic fires, not WHAT the fix produces,
+    // so the fix output is the same regardless.
+    //
+    // onlyFunctionsWithAsyncKeyword:
+    // (
+    //     r#"it("it1", async function() { expect(someValue).toBe(true); });"#,
+    //     (
+    //         r#"it("it1", async function() {expect.hasAssertions(); expect(someValue).toBe(true); });"#,
+    //         r#"it("it1", async function() {expect.assertions(); expect(someValue).toBe(true); });"#,
+    //     ),
+    //     Some(serde_json::json!([{ "onlyFunctionsWithAsyncKeyword": true }])),
+    // ),
+    //
+    // onlyFunctionsWithExpectInLoop:
+    // (
+    //     r#"it('numbers > 6', () => { for (const n of getNumbers()) { expect(n).toBeGreaterThan(6); } });"#,
+    //     (
+    //         r#"it('numbers > 6', () => {expect.hasAssertions(); for (const n of getNumbers()) { expect(n).toBeGreaterThan(6); } });"#,
+    //         r#"it('numbers > 6', () => {expect.assertions(); for (const n of getNumbers()) { expect(n).toBeGreaterThan(6); } });"#,
+    //     ),
+    //     Some(serde_json::json!([{ "onlyFunctionsWithExpectInLoop": true }])),
+    // ),
+    //
+    // onlyFunctionsWithExpectInCallback:
+    // (
+    //     r#"it('data', () => { stream.on('data', data => { expect(data).toBe(expect.any(String)); }); });"#,
+    //     (
+    //         r#"it('data', () => {expect.hasAssertions(); stream.on('data', data => { expect(data).toBe(expect.any(String)); }); });"#,
+    //         r#"it('data', () => {expect.assertions(); stream.on('data', data => { expect(data).toBe(expect.any(String)); }); });"#,
+    //     ),
+    //     Some(serde_json::json!([{ "onlyFunctionsWithExpectInCallback": true }])),
+    // ),
 
     let fix_remove_args = vec![
         (
@@ -1466,6 +1675,7 @@ fn test() {
             r#"it("it1", function() {expect.assertions(1,2,);})"#,
             r#"it("it1", function() {expect.assertions(1);})"#,
         ),
+        // hooks with block body
         (
             r#"beforeEach(() => { expect.hasAssertions("1") })"#,
             r"beforeEach(() => { expect.hasAssertions() })",
@@ -1480,6 +1690,8 @@ fn test() {
         .with_jest_plugin(true)
         .expect_fix(fix_two_suggestions)
         .expect_fix(fix_import_reassignment)
+        .expect_fix(fix_multi_statement)
+        .expect_fix(fix_has_assertions_callback_arg)
         .expect_fix(fix_remove_args)
         .test_and_snapshot();
 }
