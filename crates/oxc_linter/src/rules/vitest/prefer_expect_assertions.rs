@@ -37,32 +37,105 @@ impl std::ops::Deref for PreferExpectAssertions {
     }
 }
 
-// See <https://github.com/oxc-project/oxc/issues/6050> for documentation details.
 declare_oxc_lint!(
     /// ### What it does
     ///
-    /// FIXME: Briefly describe the rule's purpose.
+    /// Enforces that every test has either `expect.assertions(<number>)` or
+    /// `expect.hasAssertions()` as its first expression.
     ///
     /// ### Why is this bad?
     ///
-    /// FIXME: Explain why violating this rule is problematic.
+    /// Without explicit assertion counts, tests with asynchronous code,
+    /// callbacks, or loops may pass even if some `expect` calls are never
+    /// reached, silently hiding bugs.
     ///
     /// ### Examples
     ///
     /// Examples of **incorrect** code for this rule:
-    /// ```js
-    /// FIXME: Add at least one example of code that violates the rule.
+    /// ```javascript
+    /// test('no assertions', () => {
+    ///   // ...
+    /// });
+    ///
+    /// test('assertions not first', () => {
+    ///   expect(true).toBe(true);
+    ///   // ...
+    /// });
     /// ```
     ///
     /// Examples of **correct** code for this rule:
-    /// ```js
-    /// FIXME: Add at least one example of code that is allowed with the rule.
+    /// ```javascript
+    /// test('with assertion count', () => {
+    ///   expect.assertions(1);
+    ///   expect(true).toBe(true);
+    /// });
+    ///
+    /// test('with hasAssertions', () => {
+    ///   expect.hasAssertions();
+    ///   expect(true).toBe(true);
+    /// });
+    /// ```
+    ///
+    /// Examples of **incorrect** code with `{ "onlyFunctionsWithAsyncKeyword": true }`:
+    /// ```javascript
+    /// test('fetches data', async () => {
+    ///   const data = await fetchData();
+    ///   expect(data).toBe('peanut butter');
+    /// });
+    /// ```
+    ///
+    /// Examples of **correct** code with `{ "onlyFunctionsWithAsyncKeyword": true }`:
+    /// ```javascript
+    /// test('fetches data', async () => {
+    ///   expect.assertions(1);
+    ///   const data = await fetchData();
+    ///   expect(data).toBe('peanut butter');
+    /// });
+    /// ```
+    ///
+    /// Examples of **incorrect** code with `{ "onlyFunctionsWithExpectInLoop": true }`:
+    /// ```javascript
+    /// test('all numbers are greater than zero', () => {
+    ///   for (const number of getNumbers()) {
+    ///     expect(number).toBeGreaterThan(0);
+    ///   }
+    /// });
+    /// ```
+    ///
+    /// Examples of **correct** code with `{ "onlyFunctionsWithExpectInLoop": true }`:
+    /// ```javascript
+    /// test('all numbers are greater than zero', () => {
+    ///   expect.hasAssertions();
+    ///   for (const number of getNumbers()) {
+    ///     expect(number).toBeGreaterThan(0);
+    ///   }
+    /// });
+    /// ```
+    ///
+    /// Examples of **incorrect** code with `{ "onlyFunctionsWithExpectInCallback": true }`:
+    /// ```javascript
+    /// test('callback test', () => {
+    ///   fetchData((data) => {
+    ///     expect(data).toBe('peanut butter');
+    ///   });
+    /// });
+    /// ```
+    ///
+    /// Examples of **correct** code with `{ "onlyFunctionsWithExpectInCallback": true }`:
+    /// ```javascript
+    /// test('callback test', () => {
+    ///   expect.assertions(1);
+    ///   fetchData((data) => {
+    ///     expect(data).toBe('peanut butter');
+    ///   });
+    /// });
     /// ```
     PreferExpectAssertions,
     vitest,
     nursery,
     suggestion,
     version = "next",
+    config = PreferExpectAssertionsConfig
 );
 
 impl Rule for PreferExpectAssertions {
@@ -121,9 +194,6 @@ impl PreferExpectAssertionsRuleImpl for PreferExpectAssertions {
     }
 }
 
-/// Resolve the expect prefix for a vitest test callback.
-/// Checks fixture params first (`({ expect })`, `({ expect: e })`, `(ctx)`),
-/// then falls back to the file-level import prefix.
 fn resolve_expect_parameter_prefix(callback: &Expression<'_>) -> Option<CompactStr> {
     let params = match callback {
         Expression::FunctionExpression(func) => &func.params,
@@ -134,20 +204,14 @@ fn resolve_expect_parameter_prefix(callback: &Expression<'_>) -> Option<CompactS
     let first_param = params.items.first()?;
 
     match &first_param.pattern {
-        // `(ctx) => {}` → expect accessed via `ctx.expect`
         BindingPattern::BindingIdentifier(id) => {
             Some(CompactStr::from(format!("{}.expect", id.name)))
         }
-        // `({ expect })` or `({ expect: alias })`
         BindingPattern::ObjectPattern(pattern) => {
-            let Some(prop) = pattern
+            let prop = pattern
                 .properties
                 .iter()
-                .find(|p| p.key.static_name().is_some_and(|name| name == "expect"))
-            else {
-                // No `expect` in destructuring — use file-level prefix
-                return None;
-            };
+                .find(|p| p.key.static_name().is_some_and(|name| name == "expect"))?;
 
             let local_name = match &prop.value {
                 BindingPattern::BindingIdentifier(id) => id.name.as_str(),
@@ -173,7 +237,6 @@ fn test() {
         (r#"testSomething("bar", function() {})"#, None),
         ("it(async () => {expect.assertions(0);})", None),
         (
-            // vitest fixture: destructured expect
             r#"import * as vi from 'vitest';
             test("example-fail", async ({ expect }) => {
                 expect.assertions(1);
@@ -183,7 +246,6 @@ fn test() {
             None,
         ),
         (
-            // vitest fixture: expect accessed as property on context param
             r#"import { test } from 'vitest';
             test("ctx param", async (ctx) => {
                 ctx.expect.assertions(1);
@@ -193,7 +255,6 @@ fn test() {
             None,
         ),
         (
-            // vitest fixture: renamed destructured expect
             r#"import { test } from 'vitest';
             test("renamed expect", async ({ expect: myExpect }) => {
                 myExpect.assertions(1);
@@ -203,7 +264,6 @@ fn test() {
             None,
         ),
         (
-            // vitest fixture: renamed expect with hasAssertions
             r#"import { test } from 'vitest';
             test("renamed hasAssertions", async ({ expect: e }) => {
                 e.hasAssertions();
@@ -213,7 +273,6 @@ fn test() {
             None,
         ),
         (
-            // vitest fixture: context variable with hasAssertions
             r#"import { test } from 'vitest';
             test("ctx hasAssertions", async (t) => {
                 t.expect.hasAssertions();
@@ -223,7 +282,6 @@ fn test() {
             None,
         ),
         (
-            // vitest fixture: no expect in params, fallback to global
             r#"import { test, expect } from 'vitest';
             test("global expect", async () => {
                 expect.assertions(1);
@@ -233,7 +291,6 @@ fn test() {
             None,
         ),
         (
-            // import reassignment from vitest
             r#"import { expect as e } from 'vitest';
             test("reassigned vitest import", () => {
                 e.assertions(1);
@@ -243,7 +300,6 @@ fn test() {
             None,
         ),
         (
-            // Re-exported vitest: renamed expect from a third-party re-export
             r#"import { expect as e } from 'vite-plus/test';
             test("re-exported vitest", () => {
                 e.assertions(1);
@@ -252,7 +308,6 @@ fn test() {
             None,
         ),
         (
-            // Re-exported vitest: global expect from a third-party re-export
             r#"import { expect } from 'vite-plus/test';
             test("re-exported vitest global", () => {
                 expect.assertions(1);
@@ -261,7 +316,6 @@ fn test() {
             None,
         ),
         (
-            // beforeEach with renamed import covers the describe
             "import { expect as e } from 'vitest';
             describe('suite', () => {
                 beforeEach(() => { e.hasAssertions(); });
@@ -391,7 +445,6 @@ fn test() {
             None,
         ),
         (
-            // vitest fixture: renamed expect, missing assertions
             "import * as vi from 'vitest';
             it('missing assertions', ({ expect: myExpect }) => {
               myExpect(true).toBe(true);
@@ -400,7 +453,6 @@ fn test() {
             None,
         ),
         (
-            // vitest fixture: context variable, missing assertions
             "import * as vi from 'vitest';
             it('missing assertions', (ctx) => {
               ctx.expect(true).toBe(true);
@@ -409,44 +461,36 @@ fn test() {
             None,
         ),
         (
-            // vitest fixture: renamed expect, assertions with no argument
             r#"import * as vi from 'vitest';
             it("it1", ({ expect: e }) => {e.assertions();})"#,
             None,
         ),
         (
-            // vitest fixture: context variable, assertions with string argument
             r#"import * as vi from 'vitest';
             it("it1", (ctx) => {ctx.expect.assertions("1");})"#,
             None,
         ),
         (
-            // vitest fixture: renamed expect, hasAssertions with extra arguments
             r#"import * as vi from 'vitest';
             it("it1", ({ expect: e }) => {e.hasAssertions("1");})"#,
             None,
         ),
         (
-            // vitest fixture: context variable, assertions with extra arguments
             r#"import * as vi from 'vitest';
             it("it1", (ctx) => {ctx.expect.assertions(1, 2);})"#,
             None,
         ),
         (
-            // vitest import reassignment: missing assertions
             r#"import { expect as e } from 'vitest';
             test("reassigned", () => { e(true).toBe(true); });"#,
             None,
         ),
         (
-            // Re-exported vitest: missing assertions
             r#"import { expect as e } from 'vite-plus/test';
             test("re-exported missing", () => { e(true).toBe(true); });"#,
             None,
         ),
         (
-            // beforeEach uses global `expect.hasAssertions()` but import is renamed to `e`.
-            // The hook doesn't match the renamed prefix, so the test is NOT covered.
             "import { expect as e } from 'vitest';
             describe('suite', () => {
                 beforeEach(() => { expect.hasAssertions(); });

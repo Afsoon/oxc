@@ -307,12 +307,12 @@ pub fn should_check(
     has_callback || has_loop
 }
 
-pub struct HookScanner {
+struct HookScanner {
     /// The expected callee name, e.g. `"expect.hasAssertions"` or `"e.hasAssertions"`.
     expected_name: CompactStr,
-    pub has_expect_has_assertions: bool,
-    pub has_assertions_invalid_args_span: Option<Span>,
-    pub has_assertions_call_span: Option<Span>,
+    has_expect_has_assertions: bool,
+    has_assertions_invalid_args_span: Option<Span>,
+    has_assertions_call_span: Option<Span>,
 }
 
 impl HookScanner {
@@ -339,15 +339,15 @@ impl<'a> Visit<'a> for HookScanner {
     }
 }
 
-pub struct BodyScanner {
+struct BodyScanner {
     /// The expect prefix to match (e.g. `"expect"`, `"e"`, `"ctx.expect"`).
     prefix: CompactStr,
     /// Precomputed `"prefix."` for starts_with checks, avoiding allocation per call.
     prefix_dot: CompactStr,
     expression_depth: i32,
     in_loop: bool,
-    pub has_expect_in_callback: bool,
-    pub has_expect_in_loop: bool,
+    has_expect_in_callback: bool,
+    has_expect_in_loop: bool,
 }
 
 impl BodyScanner {
@@ -411,11 +411,7 @@ impl<'a> Visit<'a> for BodyScanner {
     }
 }
 
-pub fn validate_has_assertions_args(
-    call: &CallExpression<'_>,
-    prefix: &str,
-    ctx: &LintContext<'_>,
-) {
+fn validate_has_assertions_args(call: &CallExpression<'_>, prefix: &str, ctx: &LintContext<'_>) {
     if call.arguments.is_empty() {
         return;
     }
@@ -475,13 +471,13 @@ pub fn is_describe_call(call_expr: &CallExpression<'_>) -> bool {
         .is_some_and(|jest_kind| matches!(jest_kind, JestGeneralFnKind::Describe))
 }
 
-pub fn find_test_callback<'a>(call_expr: &'a CallExpression<'a>) -> Option<&'a Expression<'a>> {
+fn find_test_callback<'a>(call_expr: &'a CallExpression<'a>) -> Option<&'a Expression<'a>> {
     call_expr.arguments.iter().rev().filter_map(|arg| arg.as_expression()).find(|expr| {
         matches!(expr, Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_))
     })
 }
 
-pub fn callback_body<'a>(callback: &'a Expression<'a>) -> Option<&'a FunctionBody<'a>> {
+fn callback_body<'a>(callback: &'a Expression<'a>) -> Option<&'a FunctionBody<'a>> {
     match callback {
         Expression::FunctionExpression(func) => func.body.as_ref().map(AsRef::as_ref),
         Expression::ArrowFunctionExpression(func) => Some(&func.body),
@@ -489,7 +485,7 @@ pub fn callback_body<'a>(callback: &'a Expression<'a>) -> Option<&'a FunctionBod
     }
 }
 
-pub fn is_async_callback(callback: &Expression<'_>) -> bool {
+fn is_async_callback(callback: &Expression<'_>) -> bool {
     match callback {
         Expression::FunctionExpression(func) => func.r#async,
         Expression::ArrowFunctionExpression(func) => func.r#async,
