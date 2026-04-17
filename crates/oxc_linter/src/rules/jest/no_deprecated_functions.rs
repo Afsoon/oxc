@@ -97,7 +97,7 @@ impl Rule for NoDeprecatedFunctions {
         let node_name = chain.join(".");
 
         if let Some((base_version, replacement)) = deprecated_functions_map(&node_name)
-            && *ctx.settings().jest.version >= base_version
+            && ctx.settings().jest.version >= base_version
         {
             ctx.diagnostic_with_fix(
                 deprecated_function(&node_name, replacement, mem_expr.span()),
