@@ -316,7 +316,7 @@ mod test {
 
         let settings = OxlintSettings::deserialize(&json_value).unwrap();
 
-        assert_eq!(settings.jest.version, 20);
+        assert_eq!(settings.jest.version, Some(20));
 
         let raw_json = settings.json.unwrap();
         assert_eq!(raw_json["jest"]["version"], 20);
@@ -332,7 +332,7 @@ mod test {
 
         let settings = OxlintSettings::deserialize(&json_value).unwrap();
 
-        assert_eq!(settings.jest.version, 20);
+        assert_eq!(settings.jest.version, Some(20));
 
         let raw_json = settings.json.unwrap();
         assert_eq!(raw_json["jest"]["version"], "20");
@@ -348,7 +348,7 @@ mod test {
 
         let settings = OxlintSettings::deserialize(&json_value).unwrap();
 
-        assert_eq!(settings.jest.version, 20);
+        assert_eq!(settings.jest.version, Some(20));
 
         let raw_json = settings.json.unwrap();
         assert_eq!(raw_json["jest"]["version"], "20.1.23");
@@ -364,7 +364,7 @@ mod test {
 
         let settings = OxlintSettings::deserialize(&json_value).unwrap();
 
-        assert_eq!(settings.jest.version, 23);
+        assert_eq!(settings.jest.version, Some(23));
 
         let raw_json = settings.json.unwrap();
         assert_eq!(raw_json["jest"]["version"], "v23.12.3");

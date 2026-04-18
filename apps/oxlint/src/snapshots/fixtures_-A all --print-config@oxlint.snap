@@ -42,7 +42,7 @@ working directory: fixtures
       "typecheck": false
     },
     "jest": {
-      "version": 29
+      "version": null
     }
   },
   "env": {

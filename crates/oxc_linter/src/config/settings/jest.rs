@@ -8,25 +8,36 @@ use serde::{Deserialize, Deserializer, Serialize};
 ///
 /// See [eslint-plugin-jest](https://github.com/jest-community/eslint-plugin-jest)'s
 /// configuration for a full reference.
-#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Default, Serialize, JsonSchema, PartialEq, Eq)]
 pub struct JestPluginSettings {
     /// Jest version — accepts a number (`29`) or a semver string (`"29.1.0"` or `"v29.1.0"`),
-    /// storing only the major version. Default version is 29
-    #[serde(default = "default_jest_version", deserialize_with = "jest_version_deserialize")]
-    pub version: usize,
+    /// storing only the major version.
+    /// ::: warning
+    /// Using this config will override the `no-deprecated-functions`' config set.
+    #[serde(default, deserialize_with = "jest_version_deserialize")]
+    pub version: Option<usize>,
 }
 
-fn jest_version_deserialize<'de, D>(deserializer: D) -> Result<usize, D::Error>
+fn jest_version_deserialize<'de, D>(deserializer: D) -> Result<Option<usize>, D::Error>
 where
     D: Deserializer<'de>,
 {
     struct VersionVisitor;
 
     impl Visitor<'_> for VersionVisitor {
-        type Value = usize;
+        type Value = Option<usize>;
+
+        // Needed to impl, without this the deserialization will fail if null is provided.
+        // The lack of this impl will cause to fail config test that use Oxlintrc default values.
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(None)
+        }
 
         fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            f.write_str("Expecter Jest version as a number or string")
+            f.write_str("Expected Jest version as a number or string")
         }
 
         fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
@@ -34,6 +45,7 @@ where
             E: serde::de::Error,
         {
             usize::try_from(v)
+                .map(Some)
                 .map_err(|_| E::custom(format!("Invalid Jest version integer: {v:?}")))
         }
 
@@ -46,6 +58,7 @@ where
             }
 
             usize::try_from(v)
+                .map(Some)
                 .map_err(|_| E::custom(format!("Invalid Jest version integer: {v:?}")))
         }
 
@@ -59,21 +72,10 @@ where
                 .nth(skip_v_prefix)
                 .and_then(|semver| semver.split('.').next())
                 .and_then(|s| s.parse::<usize>().ok())
+                .map(Some)
                 .ok_or_else(|| E::custom(format!("Invalid Jest version string: {v:?}")))
         }
     }
 
     deserializer.deserialize_any(VersionVisitor)
-}
-
-fn default_jest_version() -> usize {
-    29
-}
-
-// `default = "fn"` at field level doesn't work, likely on how ancestors deserialization is being done.
-// This is likely affecting serde to know if the field is truly non present to use `default = "fn"`.
-impl Default for JestPluginSettings {
-    fn default() -> Self {
-        Self { version: 29 }
-    }
 }

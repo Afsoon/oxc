@@ -4,6 +4,8 @@ use oxc_ast::ast::Expression;
 use oxc_diagnostics::OxcDiagnostic;
 use oxc_macros::declare_oxc_lint;
 use oxc_span::{GetSpan, Span};
+use schemars::JsonSchema;
+use serde::Deserialize;
 
 use crate::{context::LintContext, rule::Rule};
 
@@ -12,8 +14,39 @@ fn deprecated_function(deprecated: &str, new: &str, span: Span) -> OxcDiagnostic
         .with_label(span)
 }
 
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", default)]
+pub struct JestConfig {
+    /// The version of Jest being used.
+    version: String,
+}
+
+impl Default for JestConfig {
+    fn default() -> Self {
+        Self { version: "29".to_string() }
+    }
+}
+
 #[derive(Debug, Default, Clone)]
-pub struct NoDeprecatedFunctions;
+pub struct NoDeprecatedFunctions(Box<NoDeprecatedFunctionsConfig>);
+
+#[derive(Debug, Default, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", default)]
+pub struct NoDeprecatedFunctionsConfig {
+    /// Jest configuration options.
+    /// Deprecated config, it will be removed in future versions.
+    /// Use please instead { "settings": { "jest": {"version": 29 } } } in `Oxlint config file`.
+    /// Beware the value from the config have higher priority than the rule config.
+    jest: JestConfig,
+}
+
+impl std::ops::Deref for NoDeprecatedFunctions {
+    type Target = NoDeprecatedFunctionsConfig;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 declare_oxc_lint!(
     /// ### What it does
@@ -66,6 +99,7 @@ declare_oxc_lint!(
     jest,
     style,
     fix,
+    config = NoDeprecatedFunctionsConfig,
     version = "0.0.18",
 );
 
@@ -81,6 +115,25 @@ fn deprecated_functions_map(deprecated_fn: &str) -> Option<(usize, &'static str)
 }
 
 impl Rule for NoDeprecatedFunctions {
+    fn from_configuration(value: serde_json::Value) -> Result<Self, serde_json::error::Error> {
+        let version = value
+            .get(0)
+            .and_then(|v| v.get("jest"))
+            .and_then(|v| v.get("version"))
+            .and_then(|v| serde_json::Value::as_str(v))
+            // Todo: Fixed Me
+            // Currently set the default version to the (maybe) latest, to help to find more problems in
+            // the codebase. In the future, the version should come from the cli option or the config files,
+            // such as `package.json` or `eslint.config.js`.
+            .unwrap_or("29");
+
+        let major: Vec<&str> = version.split('.').collect();
+
+        Ok(Self(Box::new(NoDeprecatedFunctionsConfig {
+            jest: JestConfig { version: major[0].to_string() },
+        })))
+    }
+
     fn run<'a>(&self, node: &oxc_semantic::AstNode<'a>, ctx: &LintContext<'a>) {
         let Some(mem_expr) = node.kind().as_member_expression_kind() else {
             return;
@@ -95,9 +148,14 @@ impl Rule for NoDeprecatedFunctions {
         }
 
         let node_name = chain.join(".");
+        let jest_version_num: usize = if let Some(jest_version) = ctx.settings().jest.version {
+            jest_version
+        } else {
+            self.jest.version.parse().unwrap_or(29)
+        };
 
         if let Some((base_version, replacement)) = deprecated_functions_map(&node_name)
-            && ctx.settings().jest.version >= base_version
+            && jest_version_num >= base_version
         {
             ctx.diagnostic_with_fix(
                 deprecated_function(&node_name, replacement, mem_expr.span()),
@@ -109,6 +167,65 @@ impl Rule for NoDeprecatedFunctions {
 
 #[test]
 fn tests() {
+    use crate::tester::Tester;
+
+    let pass = vec![
+        ("jest", Some(serde_json::json!([{ "jest": { "version": "14" } }]))),
+        ("require('fs')", Some(serde_json::json!([{ "jest": { "version": "14" } }]))),
+        ("jest.resetModuleRegistry", Some(serde_json::json!([{ "jest": { "version": "14" } }]))),
+        ("require.requireActual", Some(serde_json::json!([{ "jest": { "version": "17" } }]))),
+        ("jest.genMockFromModule", Some(serde_json::json!([{ "jest": { "version": "25" } }]))),
+        ("jest.genMockFromModule", Some(serde_json::json!([{ "jest": { "version": "25.1.1" } }]))),
+        ("require.requireActual", Some(serde_json::json!([{ "jest": { "version": "17.2" } }]))),
+    ];
+
+    let fail = vec![
+        ("jest.resetModuleRegistry", None),
+        // replace with `jest.resetModules` in Jest 15
+        ("jest.resetModuleRegistry", Some(serde_json::json!([{ "jest": { "version": "16" }}]))),
+        // replace with `jest.requireMock` in Jest 17.
+        ("jest.addMatchers", Some(serde_json::json!([{ "jest": { "version": "18" }}]))),
+        // replace with `jest.requireMock` in Jest 21.
+        ("require.requireMock", Some(serde_json::json!([{ "jest": { "version": "22" }}]))),
+        // replace with `jest.requireActual` in Jest 21.
+        ("require.requireActual", Some(serde_json::json!([{ "jest": { "version": "22" }}]))),
+        // replace with `jest.advanceTimersByTime` in Jest 22
+        ("jest.runTimersToTime", Some(serde_json::json!([{ "jest": { "version": "23" }}]))),
+        // replace with `jest.createMockFromModule` in Jest 26
+        ("jest.genMockFromModule", Some(serde_json::json!([{ "jest": { "version": "27" }}]))),
+    ];
+
+    let fix = vec![
+        (
+            "jest.resetModuleRegistry()",
+            "jest.resetModules()",
+            Some(serde_json::json!([{ "jest": { "version": "21" } }])),
+        ),
+        (
+            "jest.addMatchers",
+            "expect.extend",
+            Some(serde_json::json!([{ "jest": { "version": "24" } }])),
+        ),
+        (
+            "jest.genMockFromModule",
+            "jest.createMockFromModule",
+            Some(serde_json::json!([{ "jest": { "version": "26" } }])),
+        ),
+        (
+            "jest.genMockFromModule",
+            "jest.createMockFromModule",
+            Some(serde_json::json!([{ "jest": { "version": "26.0.0-next.11" } }])),
+        ),
+    ];
+
+    Tester::new(NoDeprecatedFunctions::NAME, NoDeprecatedFunctions::PLUGIN, pass, fail)
+        .with_jest_plugin(true)
+        .expect_fix(fix)
+        .test_and_snapshot();
+}
+
+#[test]
+fn test_version_from_config() {
     use crate::tester::Tester;
 
     let pass = vec![
@@ -208,6 +325,121 @@ fn tests() {
             "jest.genMockFromModule",
             "jest.createMockFromModule",
             None,
+            Some(serde_json::json!({ "settings": { "jest": { "version": "26.0.0-next.11" } }})),
+        ),
+    ];
+
+    Tester::new(NoDeprecatedFunctions::NAME, NoDeprecatedFunctions::PLUGIN, pass, fail)
+        .with_jest_plugin(true)
+        .expect_fix(fix)
+        .test_and_snapshot();
+}
+
+#[test]
+fn test_override() {
+    use crate::tester::Tester;
+
+    let pass = vec![
+        (
+            "jest",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "14" } }})),
+        ),
+        (
+            "require('fs')",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "14" } }})),
+        ),
+        (
+            "jest.resetModuleRegistry",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "14" } }})),
+        ),
+        (
+            "require.requireActual",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "17" } } })),
+        ),
+        (
+            "jest.genMockFromModule",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "25" } } })),
+        ),
+        (
+            "jest.genMockFromModule",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "25.1.1" } } })),
+        ),
+        (
+            "require.requireActual",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "17.2" } } })),
+        ),
+    ];
+
+    let fail = vec![
+        ("jest.resetModuleRegistry", None, None),
+        // replace with `jest.resetModules` in Jest 15
+        (
+            "jest.resetModuleRegistry",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "16" }}})),
+        ),
+        // replace with `jest.requireMock` in Jest 17.
+        (
+            "jest.addMatchers",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "18" }}})),
+        ),
+        // replace with `jest.requireMock` in Jest 21.
+        (
+            "require.requireMock",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "22" }}})),
+        ),
+        // replace with `jest.requireActual` in Jest 21.
+        (
+            "require.requireActual",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "22" }}})),
+        ),
+        // replace with `jest.advanceTimersByTime` in Jest 22
+        (
+            "jest.runTimersToTime",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "23" }}})),
+        ),
+        // replace with `jest.createMockFromModule` in Jest 26
+        (
+            "jest.genMockFromModule",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "27" }}})),
+        ),
+    ];
+
+    let fix = vec![
+        (
+            "jest.resetModuleRegistry()",
+            "jest.resetModules()",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "21" } }})),
+        ),
+        (
+            "jest.addMatchers",
+            "expect.extend",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "24" } }})),
+        ),
+        (
+            "jest.genMockFromModule",
+            "jest.createMockFromModule",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
+            Some(serde_json::json!({ "settings": { "jest": { "version": "26" } }})),
+        ),
+        (
+            "jest.genMockFromModule",
+            "jest.createMockFromModule",
+            Some(serde_json::json!([{ "jest": { "version": "29" } }])),
             Some(serde_json::json!({ "settings": { "jest": { "version": "26.0.0-next.11" } }})),
         ),
     ];

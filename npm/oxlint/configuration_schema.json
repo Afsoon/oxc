@@ -141,7 +141,7 @@
           "typecheck": false
         },
         "jest": {
-          "version": 29
+          "version": null
         }
       },
       "allOf": [
@@ -384,12 +384,12 @@
       "type": "object",
       "properties": {
         "version": {
-          "description": "Jest version — accepts a number (`29`) or a semver string (`\"29.1.0\"` or `\"v29.1.0\"`),\nstoring only the major version. Default version is 29",
-          "default": 29,
+          "description": "Jest version — accepts a number (`29`) or a semver string (`\"29.1.0\"` or `\"v29.1.0\"`),\nstoring only the major version.\n::: warning\nUsing this config will override the `no-deprecated-functions`' config set.",
+          "default": null,
           "type": "integer",
           "format": "uint",
           "minimum": 0.0,
-          "markdownDescription": "Jest version — accepts a number (`29`) or a semver string (`\"29.1.0\"` or `\"v29.1.0\"`),\nstoring only the major version. Default version is 29"
+          "markdownDescription": "Jest version — accepts a number (`29`) or a semver string (`\"29.1.0\"` or `\"v29.1.0\"`),\nstoring only the major version.\n::: warning\nUsing this config will override the `no-deprecated-functions`' config set."
         }
       },
       "markdownDescription": "Configure Jest plugin rules.\n\nSee [eslint-plugin-jest](https://github.com/jest-community/eslint-plugin-jest)'s\nconfiguration for a full reference."
@@ -630,7 +630,7 @@
       "properties": {
         "jest": {
           "default": {
-            "version": 29
+            "version": null
           },
           "allOf": [
             {
