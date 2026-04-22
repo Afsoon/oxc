@@ -249,6 +249,7 @@ declare_oxc_lint!(
     pedantic, // Fall through code are still incorrect.
     pending, // TODO: add a dangerous suggestion for this rule.
     config = NoFallthroughConfig,
+    version = "0.0.14",
 );
 
 impl Rule for NoFallthrough {

@@ -165,6 +165,7 @@ declare_oxc_lint!(
     style,
     fix,
     config = ArrayTypeConfig,
+    version = "0.2.8",
 );
 
 fn generic(readonly_prefix: &str, name: &str, type_name: &str, span: Span) -> OxcDiagnostic {

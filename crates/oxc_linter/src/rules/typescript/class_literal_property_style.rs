@@ -126,7 +126,8 @@ declare_oxc_lint!(
     typescript,
     style,
     pending,
-    config = ClassLiteralPropertyStyleOption
+    config = ClassLiteralPropertyStyleOption,
+    version = "1.47.0",
 );
 
 impl Rule for ClassLiteralPropertyStyle {

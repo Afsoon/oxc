@@ -258,6 +258,7 @@ declare_oxc_lint!(
     style,
     conditional_fix_suggestion,
     config = ConsistentTypeAssertionsConfig,
+    version = "1.44.0",
 );
 
 impl Rule for ConsistentTypeAssertions {

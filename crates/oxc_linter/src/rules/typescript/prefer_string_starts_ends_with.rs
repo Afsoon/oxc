@@ -51,6 +51,7 @@ declare_oxc_lint!(
     typescript,
     style,
     config = PreferStringStartsEndsWithConfig,
+    version = "0.0.8",
 );
 
 impl Rule for PreferStringStartsEndsWith {

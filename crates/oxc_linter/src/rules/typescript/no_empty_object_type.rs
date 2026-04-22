@@ -157,6 +157,7 @@ declare_oxc_lint!(
     restriction,
     pending,
     config = NoEmptyObjectTypeConfig,
+    version = "0.12.0",
 );
 
 impl Rule for NoEmptyObjectType {
