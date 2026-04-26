@@ -108,24 +108,6 @@ source: crates/oxc_linter/src/tester.rs
 
   ⚠ eslint-plugin-vitest(no-conditional-in-test): Avoid having conditionals in tests.
    ╭─[no_conditional_in_test.tsx:3:23]
- 2 │                     xit('foo', () => {
- 3 │                       switch('bar') {}
-   ·                       ────────────────
- 4 │                     })
-   ╰────
-  help: Replace conditionals with separate test cases for each branch to keep tests deterministic and easy to understand.
-
-  ⚠ eslint-plugin-vitest(no-conditional-in-test): Avoid having conditionals in tests.
-   ╭─[no_conditional_in_test.tsx:3:23]
- 2 │                     fit('foo', () => {
- 3 │                       switch('bar') {}
-   ·                       ────────────────
- 4 │                     })
-   ╰────
-  help: Replace conditionals with separate test cases for each branch to keep tests deterministic and easy to understand.
-
-  ⚠ eslint-plugin-vitest(no-conditional-in-test): Avoid having conditionals in tests.
-   ╭─[no_conditional_in_test.tsx:3:23]
  2 │                     test('foo', () => {
  3 │                       switch('bar') {}
    ·                       ────────────────
@@ -145,24 +127,6 @@ source: crates/oxc_linter/src/tester.rs
   ⚠ eslint-plugin-vitest(no-conditional-in-test): Avoid having conditionals in tests.
    ╭─[no_conditional_in_test.tsx:3:23]
  2 │                     test.only('foo', () => {
- 3 │                       switch('bar') {}
-   ·                       ────────────────
- 4 │                     })
-   ╰────
-  help: Replace conditionals with separate test cases for each branch to keep tests deterministic and easy to understand.
-
-  ⚠ eslint-plugin-vitest(no-conditional-in-test): Avoid having conditionals in tests.
-   ╭─[no_conditional_in_test.tsx:3:23]
- 2 │                     xtest('foo', () => {
- 3 │                       switch('bar') {}
-   ·                       ────────────────
- 4 │                     })
-   ╰────
-  help: Replace conditionals with separate test cases for each branch to keep tests deterministic and easy to understand.
-
-  ⚠ eslint-plugin-vitest(no-conditional-in-test): Avoid having conditionals in tests.
-   ╭─[no_conditional_in_test.tsx:3:23]
- 2 │                     xtest('foo', function () {
  3 │                       switch('bar') {}
    ·                       ────────────────
  4 │                     })
@@ -300,24 +264,6 @@ source: crates/oxc_linter/src/tester.rs
 
   ⚠ eslint-plugin-vitest(no-conditional-in-test): Avoid having conditionals in tests.
    ╭─[no_conditional_in_test.tsx:3:23]
- 2 │                     xit('foo', () => {
- 3 │                       if ('bar') {}
-   ·                       ─────────────
- 4 │                     })
-   ╰────
-  help: Replace conditionals with separate test cases for each branch to keep tests deterministic and easy to understand.
-
-  ⚠ eslint-plugin-vitest(no-conditional-in-test): Avoid having conditionals in tests.
-   ╭─[no_conditional_in_test.tsx:3:23]
- 2 │                     fit('foo', () => {
- 3 │                       if ('bar') {}
-   ·                       ─────────────
- 4 │                     })
-   ╰────
-  help: Replace conditionals with separate test cases for each branch to keep tests deterministic and easy to understand.
-
-  ⚠ eslint-plugin-vitest(no-conditional-in-test): Avoid having conditionals in tests.
-   ╭─[no_conditional_in_test.tsx:3:23]
  2 │                     test('foo', () => {
  3 │                       if ('bar') {}
    ·                       ─────────────
@@ -337,15 +283,6 @@ source: crates/oxc_linter/src/tester.rs
   ⚠ eslint-plugin-vitest(no-conditional-in-test): Avoid having conditionals in tests.
    ╭─[no_conditional_in_test.tsx:3:23]
  2 │                     test.only('foo', () => {
- 3 │                       if ('bar') {}
-   ·                       ─────────────
- 4 │                     })
-   ╰────
-  help: Replace conditionals with separate test cases for each branch to keep tests deterministic and easy to understand.
-
-  ⚠ eslint-plugin-vitest(no-conditional-in-test): Avoid having conditionals in tests.
-   ╭─[no_conditional_in_test.tsx:3:23]
- 2 │                     xtest('foo', () => {
  3 │                       if ('bar') {}
    ·                       ─────────────
  4 │                     })
