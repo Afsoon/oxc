@@ -17407,6 +17407,7 @@ impl RuleEnum {
             Self::JestPreferEach(_) => JestPreferEach::VERSION,
             Self::JestPreferEndingWithAnExpect(_) => JestPreferEndingWithAnExpect::VERSION,
             Self::JestPreferEqualityMatcher(_) => JestPreferEqualityMatcher::VERSION,
+            Self::JestPreferExpectAssertions(_) => JestPreferExpectAssertions::VERSION,
             Self::JestPreferExpectResolves(_) => JestPreferExpectResolves::VERSION,
             Self::JestPreferHooksInOrder(_) => JestPreferHooksInOrder::VERSION,
             Self::JestPreferHooksOnTop(_) => JestPreferHooksOnTop::VERSION,
@@ -17810,6 +17811,7 @@ impl RuleEnum {
             Self::VitestPreferDescribeFunctionTitle(_) => {
                 VitestPreferDescribeFunctionTitle::VERSION
             }
+            Self::VitestPreferExpectAssertions(_) => VitestPreferExpectAssertions::VERSION,
             Self::VitestPreferExpectTypeOf(_) => VitestPreferExpectTypeOf::VERSION,
             Self::VitestPreferImportInMock(_) => VitestPreferImportInMock::VERSION,
             Self::VitestPreferImportingVitestGlobals(_) => {

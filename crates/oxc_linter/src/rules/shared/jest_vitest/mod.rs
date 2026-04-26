@@ -6,4 +6,5 @@ pub mod no_alias_methods;
 pub mod no_commented_out_tests;
 pub mod no_conditional_expect;
 pub mod no_conditional_in_test;
+pub mod prefer_expect_assertions;
 pub mod valid_title;

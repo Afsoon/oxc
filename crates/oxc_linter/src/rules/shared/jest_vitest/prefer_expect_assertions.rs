@@ -37,6 +37,98 @@ impl PreferExpectAssertionsConfig {
     }
 }
 
+pub const DOCUMENTATION: &str = r#"### What it does
+
+Enforces that every test has either `expect.assertions(<number>)` or
+`expect.hasAssertions()` as its first expression.
+
+### Why is this bad?
+
+Without explicit assertion counts, tests with asynchronous code,
+callbacks, or loops may pass even if some `expect` calls are never
+reached, silently hiding bugs.
+
+### Examples
+
+Examples of **incorrect** code for this rule:
+```javascript
+test('no assertions', () => {
+  // ...
+});
+test('assertions not first', () => {
+  expect(true).toBe(true);
+  // ...
+});
+```
+
+Examples of **correct** code for this rule:
+```javascript
+test('with assertion count', () => {
+  expect.assertions(1);
+  expect(true).toBe(true);
+});
+test('with hasAssertions', () => {
+  expect.hasAssertions();
+  expect(true).toBe(true);
+});
+```
+
+///Examples of **incorrect** code with `{ "onlyFunctionsWithAsyncKeyword": true }`:
+```javascript
+test('fetches data', async () => {
+  const data = await fetchData();
+  expect(data).toBe('peanut butter');
+});
+```
+
+Examples of **correct** code with `{ "onlyFunctionsWithAsyncKeyword": true }`:
+```javascript
+test('fetches data', async () => {
+  expect.assertions(1);
+  const data = await fetchData();
+  expect(data).toBe('peanut butter');
+});
+```
+
+Examples of **incorrect** code with `{ "onlyFunctionsWithExpectInLoop": true }`:
+```javascript
+test('all numbers are greater than zero', () => {
+  for (const number of getNumbers()) {
+    expect(number).toBeGreaterThan(0);
+  }
+});
+```
+
+Examples of **correct** code with `{ "onlyFunctionsWithExpectInLoop": true }`:
+```javascript
+test('all numbers are greater than zero', () => {
+  expect.hasAssertions();
+  for (const number of getNumbers()) {
+    expect(number).toBeGreaterThan(0);
+  }
+});
+```
+
+Examples of **incorrect** code with `{ "onlyFunctionsWithExpectInCallback": true }`:
+```javascript
+test('callback test', () => {
+  fetchData((data) => {
+    expect(data).toBe('peanut butter');
+  });
+});
+```
+
+Examples of **correct** code with `{ "onlyFunctionsWithExpectInCallback": true }`:
+```javascript
+test('callback test', () => {
+  expect.assertions(1);
+  fetchData((data) => {
+    expect(data).toBe('peanut butter');
+  });
+});
+```
+"#;
+
 fn expect_shadowed_by_parameter(span: Span) -> OxcDiagnostic {
     OxcDiagnostic::warn(
         "`expect` is shadowed by a callback parameter and cannot be used for assertions.",
@@ -106,16 +198,14 @@ pub trait PreferExpectAssertionsRuleImpl {
         };
 
         match kind {
-            JestGeneralFnKind::Hook => {
-                if general.name.ends_with("Each") {
-                    Self::check_each_hook(
-                        call_expr,
-                        node.id(),
-                        file_expect_prefix,
-                        covered_describe_ids,
-                        ctx,
-                    );
-                }
+            JestGeneralFnKind::Hook if general.name.ends_with("Each") => {
+                Self::check_each_hook(
+                    call_expr,
+                    node.id(),
+                    file_expect_prefix,
+                    covered_describe_ids,
+                    ctx,
+                );
             }
             JestGeneralFnKind::Test => {
                 self.check_test(
