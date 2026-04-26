@@ -18,11 +18,14 @@ use crate::{
     config::{LintConfig, LintPlugins, OxlintEnv, OxlintGlobals, OxlintSettings},
     disable_directives::{DisableDirectives, DisableDirectivesBuilder, RuleCommentType},
     fixer::{Fix, FixKind, Message, PossibleFixes},
-    frameworks::{self, FrameworkOptions},
+    frameworks::FrameworkOptions,
     module_record::ModuleRecord,
     options::LintOptions,
     rules::RuleEnum,
 };
+
+#[cfg(not(test))]
+use crate::frameworks::{has_jest_imports, has_vitest_imports, is_jestlike_file};
 
 use super::{LintContext, plugin_name_to_prefix};
 
@@ -491,9 +494,9 @@ impl<'a> ContextHost<'a> {
         if self.plugins().has_test() {
             // let mut test_flags = FrameworkFlags::empty();
 
-            let vitest_like = frameworks::has_vitest_imports(self.module_record());
-            let jest_like = frameworks::is_jestlike_file(&self.file_path)
-                || frameworks::has_jest_imports(self.module_record());
+            let vitest_like = has_vitest_imports(self.module_record());
+            let jest_like =
+                is_jestlike_file(&self.file_path) || has_jest_imports(self.module_record());
 
             self.frameworks.set(FrameworkFlags::Vitest, vitest_like);
             self.frameworks.set(FrameworkFlags::Jest, jest_like);
