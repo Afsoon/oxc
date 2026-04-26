@@ -486,6 +486,7 @@ impl<'a> ContextHost<'a> {
     /// `package.json`` and look for relevant dependencies. This method builds
     /// on top of those hints, providing a more granular understanding of the
     /// frameworks in use.
+    #[cfg(not(test))]
     fn sniff_for_frameworks(mut self) -> Self {
         if self.plugins().has_test() {
             // let mut test_flags = FrameworkFlags::empty();
@@ -496,6 +497,21 @@ impl<'a> ContextHost<'a> {
 
             self.frameworks.set(FrameworkFlags::Vitest, vitest_like);
             self.frameworks.set(FrameworkFlags::Jest, jest_like);
+        }
+
+        self
+    }
+
+    /// Currently Oxlint isn't searching if Jest or Vitest is in `package.json`.
+    /// Once the method read the `package.json` we can discard this conditional flag,
+    /// and rely on the tester to create the correct `package.json` to have a reliable
+    /// sniff method.
+    #[cfg(test)]
+    fn sniff_for_frameworks(mut self) -> Self {
+        if self.plugins().has_test() {
+            self.frameworks.set(FrameworkFlags::Vitest, self.plugins().has_vitest());
+
+            self.frameworks.set(FrameworkFlags::Jest, self.plugins().has_jest());
         }
 
         self
