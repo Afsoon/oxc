@@ -1,6 +1,7 @@
 ---
 source: crates/oxc_linter/src/tester.rs
 ---
+
   ⚠ eslint-plugin-vitest(valid-title): correct is not allowed in test title
    ╭─[valid_title.tsx:1:6]
  1 │ test('the correct way to properly handle all things', () => {});
@@ -23,9 +24,9 @@ source: crates/oxc_linter/src/tester.rs
   help: It is included in the `disallowedWords` of your config file, try to remove it from your title
 
   ⚠ eslint-plugin-vitest(valid-title): every is not allowed in test title
-   ╭─[valid_title.tsx:1:11]
- 1 │ xdescribe('every single one of them', function () {})
-   ·           ──────────────────────────
+   ╭─[valid_title.tsx:1:10]
+ 1 │ describe('every single one of them', function () {})
+   ·          ──────────────────────────
    ╰────
   help: It is included in the `disallowedWords` of your config file, try to remove it from your title
 
@@ -58,9 +59,9 @@ source: crates/oxc_linter/src/tester.rs
   help: Make sure the title matches the `mustMatch` of your config file
 
   ⚠ eslint-plugin-vitest(valid-title): describe should match (?u)#(?:unit|integration|e2e)
-   ╭─[valid_title.tsx:1:11]
- 1 │ xdescribe('the test', () => {});
-   ·           ──────────
+   ╭─[valid_title.tsx:1:10]
+ 1 │ describe('the test', () => {});
+   ·          ──────────
    ╰────
   help: Make sure the title matches the `mustMatch` of your config file
 
@@ -149,9 +150,9 @@ source: crates/oxc_linter/src/tester.rs
   help: Replace your title with a string
 
   ⚠ eslint-plugin-vitest(valid-title): Title must be a string
-   ╭─[valid_title.tsx:1:11]
- 1 │ xdescribe(myFunction, () => {});
-   ·           ──────────
+   ╭─[valid_title.tsx:1:10]
+ 1 │ describe(myFunction, () => {});
+   ·          ──────────
    ╰────
   help: Replace your title with a string
 
@@ -228,23 +229,23 @@ source: crates/oxc_linter/src/tester.rs
   help: Write a meaningful title for your test
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have an empty title
-   ╭─[valid_title.tsx:1:11]
- 1 │ xdescribe('', () => {})
-   ·           ──
+   ╭─[valid_title.tsx:1:10]
+ 1 │ describe('', () => {})
+   ·          ──
    ╰────
   help: Write a meaningful title for your test
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have an empty title
-   ╭─[valid_title.tsx:1:5]
- 1 │ xit('', () => {})
-   ·     ──
+   ╭─[valid_title.tsx:1:4]
+ 1 │ it('', () => {})
+   ·    ──
    ╰────
   help: Write a meaningful title for your test
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have an empty title
-   ╭─[valid_title.tsx:1:7]
- 1 │ xtest('', () => {})
-   ·       ──
+   ╭─[valid_title.tsx:1:6]
+ 1 │ test('', () => {})
+   ·      ──
    ╰────
   help: Write a meaningful title for your test
 
@@ -284,23 +285,23 @@ source: crates/oxc_linter/src/tester.rs
   help: Remove the leading or trailing spaces
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have leading or trailing spaces
-   ╭─[valid_title.tsx:1:11]
- 1 │ fdescribe(' foo', function () {})
-   ·           ──────
+   ╭─[valid_title.tsx:1:10]
+ 1 │ describe(' foo', function () {})
+   ·          ──────
    ╰────
   help: Remove the leading or trailing spaces
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have leading or trailing spaces
-   ╭─[valid_title.tsx:1:11]
- 1 │ fdescribe(' foo', function () {})
-   ·           ──────
+   ╭─[valid_title.tsx:1:10]
+ 1 │ describe(' foo', function () {})
+   ·          ──────
    ╰────
   help: Remove the leading or trailing spaces
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have leading or trailing spaces
-   ╭─[valid_title.tsx:1:11]
- 1 │ xdescribe(' foo', function () {})
-   ·           ──────
+   ╭─[valid_title.tsx:1:10]
+ 1 │ describe(' foo', function () {})
+   ·          ──────
    ╰────
   help: Remove the leading or trailing spaces
 
@@ -319,9 +320,9 @@ source: crates/oxc_linter/src/tester.rs
   help: Remove the leading or trailing spaces
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have leading or trailing spaces
-   ╭─[valid_title.tsx:1:5]
- 1 │ fit(' foo', function () {})
-   ·     ──────
+   ╭─[valid_title.tsx:1:4]
+ 1 │ it(' foo', function () {})
+   ·    ──────
    ╰────
   help: Remove the leading or trailing spaces
 
@@ -333,9 +334,9 @@ source: crates/oxc_linter/src/tester.rs
   help: Remove the leading or trailing spaces
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have leading or trailing spaces
-   ╭─[valid_title.tsx:1:5]
- 1 │ fit('foo ', function () {})
-   ·     ──────
+   ╭─[valid_title.tsx:1:4]
+ 1 │ it('foo ', function () {})
+   ·    ──────
    ╰────
   help: Remove the leading or trailing spaces
 
@@ -356,9 +357,9 @@ source: crates/oxc_linter/src/tester.rs
   help: Remove the leading or trailing spaces
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have leading or trailing spaces
-   ╭─[valid_title.tsx:1:5]
- 1 │ xit(' foo', function () {})
-   ·     ──────
+   ╭─[valid_title.tsx:1:4]
+ 1 │ it(' foo', function () {})
+   ·    ──────
    ╰────
   help: Remove the leading or trailing spaces
 
@@ -419,16 +420,16 @@ source: crates/oxc_linter/src/tester.rs
   help: Remove the leading or trailing spaces
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have leading or trailing spaces
-   ╭─[valid_title.tsx:1:7]
- 1 │ xtest(' foo', function () {})
-   ·       ──────
+   ╭─[valid_title.tsx:1:6]
+ 1 │ test(' foo', function () {})
+   ·      ──────
    ╰────
   help: Remove the leading or trailing spaces
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have leading or trailing spaces
-   ╭─[valid_title.tsx:1:7]
- 1 │ xtest(' foo  ', function () {})
-   ·       ────────
+   ╭─[valid_title.tsx:1:6]
+ 1 │ test(' foo  ', function () {})
+   ·      ────────
    ╰────
   help: Remove the leading or trailing spaces
 
@@ -458,16 +459,9 @@ source: crates/oxc_linter/src/tester.rs
   help: The function name already has the prefix, try to remove the duplicate prefix
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have duplicate prefix
-   ╭─[valid_title.tsx:1:11]
- 1 │ fdescribe('describe foo', function () {})
-   ·           ──────────────
-   ╰────
-  help: The function name already has the prefix, try to remove the duplicate prefix
-
-  ⚠ eslint-plugin-vitest(valid-title): Should not have duplicate prefix
-   ╭─[valid_title.tsx:1:11]
- 1 │ xdescribe('describe foo', function () {})
-   ·           ──────────────
+   ╭─[valid_title.tsx:1:10]
+ 1 │ describe('describe foo', function () {})
+   ·          ──────────────
    ╰────
   help: The function name already has the prefix, try to remove the duplicate prefix
 
@@ -479,9 +473,16 @@ source: crates/oxc_linter/src/tester.rs
   help: The function name already has the prefix, try to remove the duplicate prefix
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have duplicate prefix
-   ╭─[valid_title.tsx:1:11]
- 1 │ fdescribe(`describe foo`, function () {})
-   ·           ──────────────
+   ╭─[valid_title.tsx:1:10]
+ 1 │ describe('describe foo', function () {})
+   ·          ──────────────
+   ╰────
+  help: The function name already has the prefix, try to remove the duplicate prefix
+
+  ⚠ eslint-plugin-vitest(valid-title): Should not have duplicate prefix
+   ╭─[valid_title.tsx:1:10]
+ 1 │ describe(`describe foo`, function () {})
+   ·          ──────────────
    ╰────
   help: The function name already has the prefix, try to remove the duplicate prefix
 
@@ -493,9 +494,9 @@ source: crates/oxc_linter/src/tester.rs
   help: The function name already has the prefix, try to remove the duplicate prefix
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have duplicate prefix
-   ╭─[valid_title.tsx:1:7]
- 1 │ xtest('test foo', function () {})
-   ·       ──────────
+   ╭─[valid_title.tsx:1:6]
+ 1 │ test('test foo', function () {})
+   ·      ──────────
    ╰────
   help: The function name already has the prefix, try to remove the duplicate prefix
 
@@ -521,16 +522,16 @@ source: crates/oxc_linter/src/tester.rs
   help: The function name already has the prefix, try to remove the duplicate prefix
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have duplicate prefix
-   ╭─[valid_title.tsx:1:5]
- 1 │ fit('it foo', function () {})
-   ·     ────────
+   ╭─[valid_title.tsx:1:4]
+ 1 │ it('it foo', function () {})
+   ·    ────────
    ╰────
   help: The function name already has the prefix, try to remove the duplicate prefix
 
   ⚠ eslint-plugin-vitest(valid-title): Should not have duplicate prefix
-   ╭─[valid_title.tsx:1:5]
- 1 │ xit('it foo', function () {})
-   ·     ────────
+   ╭─[valid_title.tsx:1:4]
+ 1 │ it('it foo', function () {})
+   ·    ────────
    ╰────
   help: The function name already has the prefix, try to remove the duplicate prefix
 

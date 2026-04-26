@@ -77,7 +77,7 @@ source: crates/oxc_linter/src/tester.rs
   ⚠ eslint-plugin-vitest(max-nested-describe): Enforces a maximum depth to nested describe calls.
     ╭─[max_nested_describe.tsx:18:17]
  17 │     
- 18 │ ╭─▶                 xdescribe('qux', () => {
+ 18 │ ╭─▶                 describe('qux', () => {
  19 │ │                       it('should get something', () => {
  20 │ │                           expect(getSomething()).toBe('Something');
  21 │ │                       });

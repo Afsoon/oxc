@@ -64,7 +64,7 @@ fn test() {
                                     });
                                 });
 
-                                fdescribe('qux', () => {
+                                describe('qux', () => {
                                     it('something', async () => {
                                         expect('something').toBe('something');
                                     });
@@ -86,7 +86,7 @@ fn test() {
                     });
                 });
 
-                xdescribe('foo', function() {
+                describe('foo', function() {
                     describe('bar', function() {
                         it('something', async () => {
                             expect('something').toBe('something');
@@ -194,7 +194,7 @@ fn test() {
         ),
         (
             "
-                fdescribe('foo', () => {
+                describe('foo', () => {
                     describe.only('bar', () => {
                         describe.skip('baz', () => {
                             it('should get something', () => {
@@ -210,7 +210,7 @@ fn test() {
                     });
                 });
 
-                xdescribe('qux', () => {
+                describe('qux', () => {
                     it('should get something', () => {
                         expect(getSomething()).toBe('Something');
                     });
