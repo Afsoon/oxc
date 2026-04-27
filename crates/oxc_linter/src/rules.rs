@@ -735,8 +735,16 @@ pub(crate) mod vitest {
     pub mod no_conditional_expect;
     pub mod no_conditional_in_test;
     pub mod no_conditional_tests;
+    pub mod no_disabled_tests;
+    pub mod no_duplicate_hooks;
+    pub mod no_focused_tests;
+    pub mod no_hooks;
+    pub mod no_identical_title;
     pub mod no_import_node_test;
     pub mod no_importing_vitest_globals;
+    pub mod no_interpolation_in_snapshots;
+    pub mod no_large_snapshots;
+    pub mod no_mocks_import;
     pub mod prefer_called_exactly_once_with;
     pub mod prefer_called_once;
     pub mod prefer_called_times;
@@ -749,10 +757,14 @@ pub(crate) mod vitest {
     pub mod prefer_to_be_falsy;
     pub mod prefer_to_be_object;
     pub mod prefer_to_be_truthy;
+    pub mod prefer_to_contain;
+    pub mod prefer_todo;
     pub mod require_awaited_expect_poll;
     pub mod require_local_test_context_for_concurrent_snapshots;
     pub mod require_mock_type_parameters;
     pub mod require_test_timeout;
+    pub mod require_top_level_describe;
+    pub mod valid_expect;
     pub mod valid_title;
     pub mod warn_todo;
 }
@@ -773,7 +785,9 @@ pub(crate) mod vue {
     pub mod max_props;
     pub mod no_arrow_functions_in_watch;
     pub mod no_deprecated_data_object_declaration;
+    pub mod no_deprecated_delete_set;
     pub mod no_deprecated_destroyed_lifecycle;
+    pub mod no_deprecated_events_api;
     pub mod no_deprecated_vue_config_keycodes;
     pub mod no_export_in_script_setup;
     pub mod no_import_compiler_macros;
