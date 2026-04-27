@@ -767,6 +767,7 @@ pub(crate) mod vitest {
     pub mod require_mock_type_parameters;
     pub mod require_test_timeout;
     pub mod require_top_level_describe;
+    pub mod valid_describe_callback;
     pub mod valid_expect;
     pub mod valid_expect_in_promise;
     pub mod valid_title;
