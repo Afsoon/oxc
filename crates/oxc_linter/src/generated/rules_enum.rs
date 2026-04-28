@@ -729,6 +729,7 @@ pub use crate::rules::vitest::prefer_expect_type_of::PreferExpectTypeOf as Vites
 pub use crate::rules::vitest::prefer_import_in_mock::PreferImportInMock as VitestPreferImportInMock;
 pub use crate::rules::vitest::prefer_importing_vitest_globals::PreferImportingVitestGlobals as VitestPreferImportingVitestGlobals;
 pub use crate::rules::vitest::prefer_snapshot_hint::PreferSnapshotHint as VitestPreferSnapshotHint;
+pub use crate::rules::vitest::prefer_spy_on::PreferSpyOn as VitestPreferSpyOn;
 pub use crate::rules::vitest::prefer_strict_boolean_matchers::PreferStrictBooleanMatchers as VitestPreferStrictBooleanMatchers;
 pub use crate::rules::vitest::prefer_strict_equal::PreferStrictEqual as VitestPreferStrictEqual;
 pub use crate::rules::vitest::prefer_to_be::PreferToBe as VitestPreferToBe;
@@ -1499,6 +1500,7 @@ pub enum RuleEnum {
     VitestPreferImportInMock(VitestPreferImportInMock),
     VitestPreferImportingVitestGlobals(VitestPreferImportingVitestGlobals),
     VitestPreferSnapshotHint(VitestPreferSnapshotHint),
+    VitestPreferSpyOn(VitestPreferSpyOn),
     VitestPreferStrictBooleanMatchers(VitestPreferStrictBooleanMatchers),
     VitestPreferStrictEqual(VitestPreferStrictEqual),
     VitestPreferToBe(VitestPreferToBe),
@@ -2354,7 +2356,8 @@ const VITEST_PREFER_EXPECT_TYPE_OF_ID: usize = VITEST_PREFER_EXPECT_ASSERTIONS_I
 const VITEST_PREFER_IMPORT_IN_MOCK_ID: usize = VITEST_PREFER_EXPECT_TYPE_OF_ID + 1usize;
 const VITEST_PREFER_IMPORTING_VITEST_GLOBALS_ID: usize = VITEST_PREFER_IMPORT_IN_MOCK_ID + 1usize;
 const VITEST_PREFER_SNAPSHOT_HINT_ID: usize = VITEST_PREFER_IMPORTING_VITEST_GLOBALS_ID + 1usize;
-const VITEST_PREFER_STRICT_BOOLEAN_MATCHERS_ID: usize = VITEST_PREFER_SNAPSHOT_HINT_ID + 1usize;
+const VITEST_PREFER_SPY_ON_ID: usize = VITEST_PREFER_SNAPSHOT_HINT_ID + 1usize;
+const VITEST_PREFER_STRICT_BOOLEAN_MATCHERS_ID: usize = VITEST_PREFER_SPY_ON_ID + 1usize;
 const VITEST_PREFER_STRICT_EQUAL_ID: usize = VITEST_PREFER_STRICT_BOOLEAN_MATCHERS_ID + 1usize;
 const VITEST_PREFER_TO_BE_ID: usize = VITEST_PREFER_STRICT_EQUAL_ID + 1usize;
 const VITEST_PREFER_TO_BE_FALSY_ID: usize = VITEST_PREFER_TO_BE_ID + 1usize;
@@ -3239,6 +3242,7 @@ impl RuleEnum {
                 VITEST_PREFER_IMPORTING_VITEST_GLOBALS_ID
             }
             Self::VitestPreferSnapshotHint(_) => VITEST_PREFER_SNAPSHOT_HINT_ID,
+            Self::VitestPreferSpyOn(_) => VITEST_PREFER_SPY_ON_ID,
             Self::VitestPreferStrictBooleanMatchers(_) => VITEST_PREFER_STRICT_BOOLEAN_MATCHERS_ID,
             Self::VitestPreferStrictEqual(_) => VITEST_PREFER_STRICT_EQUAL_ID,
             Self::VitestPreferToBe(_) => VITEST_PREFER_TO_BE_ID,
@@ -4112,6 +4116,7 @@ impl RuleEnum {
             Self::VitestPreferImportInMock(_) => VitestPreferImportInMock::NAME,
             Self::VitestPreferImportingVitestGlobals(_) => VitestPreferImportingVitestGlobals::NAME,
             Self::VitestPreferSnapshotHint(_) => VitestPreferSnapshotHint::NAME,
+            Self::VitestPreferSpyOn(_) => VitestPreferSpyOn::NAME,
             Self::VitestPreferStrictBooleanMatchers(_) => VitestPreferStrictBooleanMatchers::NAME,
             Self::VitestPreferStrictEqual(_) => VitestPreferStrictEqual::NAME,
             Self::VitestPreferToBe(_) => VitestPreferToBe::NAME,
@@ -5033,6 +5038,7 @@ impl RuleEnum {
                 VitestPreferImportingVitestGlobals::CATEGORY
             }
             Self::VitestPreferSnapshotHint(_) => VitestPreferSnapshotHint::CATEGORY,
+            Self::VitestPreferSpyOn(_) => VitestPreferSpyOn::CATEGORY,
             Self::VitestPreferStrictBooleanMatchers(_) => {
                 VitestPreferStrictBooleanMatchers::CATEGORY
             }
@@ -5911,6 +5917,7 @@ impl RuleEnum {
             Self::VitestPreferImportInMock(_) => VitestPreferImportInMock::FIX,
             Self::VitestPreferImportingVitestGlobals(_) => VitestPreferImportingVitestGlobals::FIX,
             Self::VitestPreferSnapshotHint(_) => VitestPreferSnapshotHint::FIX,
+            Self::VitestPreferSpyOn(_) => VitestPreferSpyOn::FIX,
             Self::VitestPreferStrictBooleanMatchers(_) => VitestPreferStrictBooleanMatchers::FIX,
             Self::VitestPreferStrictEqual(_) => VitestPreferStrictEqual::FIX,
             Self::VitestPreferToBe(_) => VitestPreferToBe::FIX,
@@ -6995,6 +7002,7 @@ impl RuleEnum {
                 VitestPreferImportingVitestGlobals::documentation()
             }
             Self::VitestPreferSnapshotHint(_) => VitestPreferSnapshotHint::documentation(),
+            Self::VitestPreferSpyOn(_) => VitestPreferSpyOn::documentation(),
             Self::VitestPreferStrictBooleanMatchers(_) => {
                 VitestPreferStrictBooleanMatchers::documentation()
             }
@@ -9110,6 +9118,8 @@ impl RuleEnum {
             }
             Self::VitestPreferSnapshotHint(_) => VitestPreferSnapshotHint::config_schema(generator)
                 .or_else(|| VitestPreferSnapshotHint::schema(generator)),
+            Self::VitestPreferSpyOn(_) => VitestPreferSpyOn::config_schema(generator)
+                .or_else(|| VitestPreferSpyOn::schema(generator)),
             Self::VitestPreferStrictBooleanMatchers(_) => {
                 VitestPreferStrictBooleanMatchers::config_schema(generator)
                     .or_else(|| VitestPreferStrictBooleanMatchers::schema(generator))
@@ -9972,6 +9982,7 @@ impl RuleEnum {
             Self::VitestPreferImportInMock(_) => "vitest",
             Self::VitestPreferImportingVitestGlobals(_) => "vitest",
             Self::VitestPreferSnapshotHint(_) => "vitest",
+            Self::VitestPreferSpyOn(_) => "vitest",
             Self::VitestPreferStrictBooleanMatchers(_) => "vitest",
             Self::VitestPreferStrictEqual(_) => "vitest",
             Self::VitestPreferToBe(_) => "vitest",
@@ -12328,6 +12339,9 @@ impl RuleEnum {
             Self::VitestPreferSnapshotHint(_) => Ok(Self::VitestPreferSnapshotHint(
                 VitestPreferSnapshotHint::from_configuration(value)?,
             )),
+            Self::VitestPreferSpyOn(_) => {
+                Ok(Self::VitestPreferSpyOn(VitestPreferSpyOn::from_configuration(value)?))
+            }
             Self::VitestPreferStrictBooleanMatchers(_) => {
                 Ok(Self::VitestPreferStrictBooleanMatchers(
                     VitestPreferStrictBooleanMatchers::from_configuration(value)?,
@@ -13209,6 +13223,7 @@ impl RuleEnum {
             Self::VitestPreferImportInMock(rule) => rule.to_configuration(),
             Self::VitestPreferImportingVitestGlobals(rule) => rule.to_configuration(),
             Self::VitestPreferSnapshotHint(rule) => rule.to_configuration(),
+            Self::VitestPreferSpyOn(rule) => rule.to_configuration(),
             Self::VitestPreferStrictBooleanMatchers(rule) => rule.to_configuration(),
             Self::VitestPreferStrictEqual(rule) => rule.to_configuration(),
             Self::VitestPreferToBe(rule) => rule.to_configuration(),
@@ -13980,6 +13995,7 @@ impl RuleEnum {
             Self::VitestPreferImportInMock(rule) => rule.run(node, ctx),
             Self::VitestPreferImportingVitestGlobals(rule) => rule.run(node, ctx),
             Self::VitestPreferSnapshotHint(rule) => rule.run(node, ctx),
+            Self::VitestPreferSpyOn(rule) => rule.run(node, ctx),
             Self::VitestPreferStrictBooleanMatchers(rule) => rule.run(node, ctx),
             Self::VitestPreferStrictEqual(rule) => rule.run(node, ctx),
             Self::VitestPreferToBe(rule) => rule.run(node, ctx),
@@ -14749,6 +14765,7 @@ impl RuleEnum {
             Self::VitestPreferImportInMock(rule) => rule.run_once(ctx),
             Self::VitestPreferImportingVitestGlobals(rule) => rule.run_once(ctx),
             Self::VitestPreferSnapshotHint(rule) => rule.run_once(ctx),
+            Self::VitestPreferSpyOn(rule) => rule.run_once(ctx),
             Self::VitestPreferStrictBooleanMatchers(rule) => rule.run_once(ctx),
             Self::VitestPreferStrictEqual(rule) => rule.run_once(ctx),
             Self::VitestPreferToBe(rule) => rule.run_once(ctx),
@@ -15620,6 +15637,7 @@ impl RuleEnum {
             Self::VitestPreferImportInMock(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferImportingVitestGlobals(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferSnapshotHint(rule) => rule.run_on_jest_node(jest_node, ctx),
+            Self::VitestPreferSpyOn(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferStrictBooleanMatchers(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferStrictEqual(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferToBe(rule) => rule.run_on_jest_node(jest_node, ctx),
@@ -16393,6 +16411,7 @@ impl RuleEnum {
             Self::VitestPreferImportInMock(rule) => rule.should_run(ctx),
             Self::VitestPreferImportingVitestGlobals(rule) => rule.should_run(ctx),
             Self::VitestPreferSnapshotHint(rule) => rule.should_run(ctx),
+            Self::VitestPreferSpyOn(rule) => rule.should_run(ctx),
             Self::VitestPreferStrictBooleanMatchers(rule) => rule.should_run(ctx),
             Self::VitestPreferStrictEqual(rule) => rule.should_run(ctx),
             Self::VitestPreferToBe(rule) => rule.should_run(ctx),
@@ -17472,6 +17491,7 @@ impl RuleEnum {
                 VitestPreferImportingVitestGlobals::IS_TSGOLINT_RULE
             }
             Self::VitestPreferSnapshotHint(_) => VitestPreferSnapshotHint::IS_TSGOLINT_RULE,
+            Self::VitestPreferSpyOn(_) => VitestPreferSpyOn::IS_TSGOLINT_RULE,
             Self::VitestPreferStrictBooleanMatchers(_) => {
                 VitestPreferStrictBooleanMatchers::IS_TSGOLINT_RULE
             }
@@ -18411,6 +18431,7 @@ impl RuleEnum {
                 VitestPreferImportingVitestGlobals::VERSION
             }
             Self::VitestPreferSnapshotHint(_) => VitestPreferSnapshotHint::VERSION,
+            Self::VitestPreferSpyOn(_) => VitestPreferSpyOn::VERSION,
             Self::VitestPreferStrictBooleanMatchers(_) => {
                 VitestPreferStrictBooleanMatchers::VERSION
             }
@@ -19367,6 +19388,7 @@ impl RuleEnum {
                 VitestPreferImportingVitestGlobals::HAS_CONFIG
             }
             Self::VitestPreferSnapshotHint(_) => VitestPreferSnapshotHint::HAS_CONFIG,
+            Self::VitestPreferSpyOn(_) => VitestPreferSpyOn::HAS_CONFIG,
             Self::VitestPreferStrictBooleanMatchers(_) => {
                 VitestPreferStrictBooleanMatchers::HAS_CONFIG
             }
@@ -20148,6 +20170,7 @@ impl RuleEnum {
             Self::VitestPreferImportInMock(rule) => rule.types_info(),
             Self::VitestPreferImportingVitestGlobals(rule) => rule.types_info(),
             Self::VitestPreferSnapshotHint(rule) => rule.types_info(),
+            Self::VitestPreferSpyOn(rule) => rule.types_info(),
             Self::VitestPreferStrictBooleanMatchers(rule) => rule.types_info(),
             Self::VitestPreferStrictEqual(rule) => rule.types_info(),
             Self::VitestPreferToBe(rule) => rule.types_info(),
@@ -20917,6 +20940,7 @@ impl RuleEnum {
             Self::VitestPreferImportInMock(rule) => rule.run_info(),
             Self::VitestPreferImportingVitestGlobals(rule) => rule.run_info(),
             Self::VitestPreferSnapshotHint(rule) => rule.run_info(),
+            Self::VitestPreferSpyOn(rule) => rule.run_info(),
             Self::VitestPreferStrictBooleanMatchers(rule) => rule.run_info(),
             Self::VitestPreferStrictEqual(rule) => rule.run_info(),
             Self::VitestPreferToBe(rule) => rule.run_info(),
@@ -21806,6 +21830,7 @@ pub static RULES: std::sync::LazyLock<Vec<RuleEnum>> = std::sync::LazyLock::new(
         RuleEnum::VitestPreferImportInMock(VitestPreferImportInMock::default()),
         RuleEnum::VitestPreferImportingVitestGlobals(VitestPreferImportingVitestGlobals::default()),
         RuleEnum::VitestPreferSnapshotHint(VitestPreferSnapshotHint::default()),
+        RuleEnum::VitestPreferSpyOn(VitestPreferSpyOn::default()),
         RuleEnum::VitestPreferStrictBooleanMatchers(VitestPreferStrictBooleanMatchers::default()),
         RuleEnum::VitestPreferStrictEqual(VitestPreferStrictEqual::default()),
         RuleEnum::VitestPreferToBe(VitestPreferToBe::default()),

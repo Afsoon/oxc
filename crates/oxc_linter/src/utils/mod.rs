@@ -37,7 +37,7 @@ pub use self::{
 // the crates/oxc_linter/data/vitest_compatible_jest_rules.json
 // file is also updated. The JSON file is used by the oxlint-migrate
 // and eslint-plugin-oxlint repos to keep everything synced.
-const VITEST_COMPATIBLE_JEST_RULES: [&str; 14] = [
+const VITEST_COMPATIBLE_JEST_RULES: [&str; 13] = [
     "no-test-prefixes",
     "no-test-return-statement",
     "no-unneeded-async-expect-function",
@@ -51,7 +51,6 @@ const VITEST_COMPATIBLE_JEST_RULES: [&str; 14] = [
     "prefer-lowercase-title",
     "prefer-mock-promise-shorthand",
     "prefer-mock-return-shorthand",
-    "prefer-spy-on",
 ];
 
 /// List of Eslint rules that have TypeScript equivalents.

@@ -757,6 +757,7 @@ pub(crate) mod vitest {
     pub mod prefer_import_in_mock;
     pub mod prefer_importing_vitest_globals;
     pub mod prefer_snapshot_hint;
+    pub mod prefer_spy_on;
     pub mod prefer_strict_boolean_matchers;
     pub mod prefer_strict_equal;
     pub mod prefer_to_be;
