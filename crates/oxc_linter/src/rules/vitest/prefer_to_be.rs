@@ -10,7 +10,7 @@ use crate::{
 #[derive(Debug, Default, Clone)]
 pub struct PreferToBe;
 
-declare_oxc_lint!(PreferToBe, jest, style, fix, docs = DOCUMENTATION, version = "0.2.14",);
+declare_oxc_lint!(PreferToBe, vitest, style, fix, docs = DOCUMENTATION, version = "0.2.14",);
 
 impl Rule for PreferToBe {
     fn run_on_jest_node<'a, 'c>(
@@ -313,7 +313,7 @@ fn tests() {
     ];
 
     Tester::new(PreferToBe::NAME, PreferToBe::PLUGIN, pass, fail)
-        .with_jest_plugin(true)
+        .with_vitest_plugin(true)
         .expect_fix(fix)
         .test_and_snapshot();
 }
