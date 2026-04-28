@@ -736,6 +736,7 @@ pub use crate::rules::vitest::prefer_to_be_truthy::PreferToBeTruthy as VitestPre
 pub use crate::rules::vitest::prefer_to_contain::PreferToContain as VitestPreferToContain;
 pub use crate::rules::vitest::prefer_todo::PreferTodo as VitestPreferTodo;
 pub use crate::rules::vitest::require_awaited_expect_poll::RequireAwaitedExpectPoll as VitestRequireAwaitedExpectPoll;
+pub use crate::rules::vitest::require_hook::RequireHook as VitestRequireHook;
 pub use crate::rules::vitest::require_local_test_context_for_concurrent_snapshots::RequireLocalTestContextForConcurrentSnapshots as VitestRequireLocalTestContextForConcurrentSnapshots;
 pub use crate::rules::vitest::require_mock_type_parameters::RequireMockTypeParameters as VitestRequireMockTypeParameters;
 pub use crate::rules::vitest::require_test_timeout::RequireTestTimeout as VitestRequireTestTimeout;
@@ -1501,6 +1502,7 @@ pub enum RuleEnum {
     VitestPreferToContain(VitestPreferToContain),
     VitestPreferTodo(VitestPreferTodo),
     VitestRequireAwaitedExpectPoll(VitestRequireAwaitedExpectPoll),
+    VitestRequireHook(VitestRequireHook),
     VitestRequireLocalTestContextForConcurrentSnapshots(
         VitestRequireLocalTestContextForConcurrentSnapshots,
     ),
@@ -2351,8 +2353,9 @@ const VITEST_PREFER_TO_BE_TRUTHY_ID: usize = VITEST_PREFER_TO_BE_OBJECT_ID + 1us
 const VITEST_PREFER_TO_CONTAIN_ID: usize = VITEST_PREFER_TO_BE_TRUTHY_ID + 1usize;
 const VITEST_PREFER_TODO_ID: usize = VITEST_PREFER_TO_CONTAIN_ID + 1usize;
 const VITEST_REQUIRE_AWAITED_EXPECT_POLL_ID: usize = VITEST_PREFER_TODO_ID + 1usize;
+const VITEST_REQUIRE_HOOK_ID: usize = VITEST_REQUIRE_AWAITED_EXPECT_POLL_ID + 1usize;
 const VITEST_REQUIRE_LOCAL_TEST_CONTEXT_FOR_CONCURRENT_SNAPSHOTS_ID: usize =
-    VITEST_REQUIRE_AWAITED_EXPECT_POLL_ID + 1usize;
+    VITEST_REQUIRE_HOOK_ID + 1usize;
 const VITEST_REQUIRE_MOCK_TYPE_PARAMETERS_ID: usize =
     VITEST_REQUIRE_LOCAL_TEST_CONTEXT_FOR_CONCURRENT_SNAPSHOTS_ID + 1usize;
 const VITEST_REQUIRE_TEST_TIMEOUT_ID: usize = VITEST_REQUIRE_MOCK_TYPE_PARAMETERS_ID + 1usize;
@@ -3231,6 +3234,7 @@ impl RuleEnum {
             Self::VitestPreferToContain(_) => VITEST_PREFER_TO_CONTAIN_ID,
             Self::VitestPreferTodo(_) => VITEST_PREFER_TODO_ID,
             Self::VitestRequireAwaitedExpectPoll(_) => VITEST_REQUIRE_AWAITED_EXPECT_POLL_ID,
+            Self::VitestRequireHook(_) => VITEST_REQUIRE_HOOK_ID,
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(_) => {
                 VITEST_REQUIRE_LOCAL_TEST_CONTEXT_FOR_CONCURRENT_SNAPSHOTS_ID
             }
@@ -4097,6 +4101,7 @@ impl RuleEnum {
             Self::VitestPreferToContain(_) => VitestPreferToContain::NAME,
             Self::VitestPreferTodo(_) => VitestPreferTodo::NAME,
             Self::VitestRequireAwaitedExpectPoll(_) => VitestRequireAwaitedExpectPoll::NAME,
+            Self::VitestRequireHook(_) => VitestRequireHook::NAME,
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(_) => {
                 VitestRequireLocalTestContextForConcurrentSnapshots::NAME
             }
@@ -5015,6 +5020,7 @@ impl RuleEnum {
             Self::VitestPreferToContain(_) => VitestPreferToContain::CATEGORY,
             Self::VitestPreferTodo(_) => VitestPreferTodo::CATEGORY,
             Self::VitestRequireAwaitedExpectPoll(_) => VitestRequireAwaitedExpectPoll::CATEGORY,
+            Self::VitestRequireHook(_) => VitestRequireHook::CATEGORY,
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(_) => {
                 VitestRequireLocalTestContextForConcurrentSnapshots::CATEGORY
             }
@@ -5884,6 +5890,7 @@ impl RuleEnum {
             Self::VitestPreferToContain(_) => VitestPreferToContain::FIX,
             Self::VitestPreferTodo(_) => VitestPreferTodo::FIX,
             Self::VitestRequireAwaitedExpectPoll(_) => VitestRequireAwaitedExpectPoll::FIX,
+            Self::VitestRequireHook(_) => VitestRequireHook::FIX,
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(_) => {
                 VitestRequireLocalTestContextForConcurrentSnapshots::FIX
             }
@@ -6967,6 +6974,7 @@ impl RuleEnum {
             Self::VitestRequireAwaitedExpectPoll(_) => {
                 VitestRequireAwaitedExpectPoll::documentation()
             }
+            Self::VitestRequireHook(_) => VitestRequireHook::documentation(),
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(_) => {
                 VitestRequireLocalTestContextForConcurrentSnapshots::documentation()
             }
@@ -9082,6 +9090,8 @@ impl RuleEnum {
                 VitestRequireAwaitedExpectPoll::config_schema(generator)
                     .or_else(|| VitestRequireAwaitedExpectPoll::schema(generator))
             }
+            Self::VitestRequireHook(_) => VitestRequireHook::config_schema(generator)
+                .or_else(|| VitestRequireHook::schema(generator)),
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(_) => {
                 VitestRequireLocalTestContextForConcurrentSnapshots::config_schema(generator)
                     .or_else(|| {
@@ -9921,6 +9931,7 @@ impl RuleEnum {
             Self::VitestPreferToContain(_) => "vitest",
             Self::VitestPreferTodo(_) => "vitest",
             Self::VitestRequireAwaitedExpectPoll(_) => "vitest",
+            Self::VitestRequireHook(_) => "vitest",
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(_) => "vitest",
             Self::VitestRequireMockTypeParameters(_) => "vitest",
             Self::VitestRequireTestTimeout(_) => "vitest",
@@ -12288,6 +12299,9 @@ impl RuleEnum {
             Self::VitestRequireAwaitedExpectPoll(_) => Ok(Self::VitestRequireAwaitedExpectPoll(
                 VitestRequireAwaitedExpectPoll::from_configuration(value)?,
             )),
+            Self::VitestRequireHook(_) => {
+                Ok(Self::VitestRequireHook(VitestRequireHook::from_configuration(value)?))
+            }
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(_) => {
                 Ok(Self::VitestRequireLocalTestContextForConcurrentSnapshots(
                     VitestRequireLocalTestContextForConcurrentSnapshots::from_configuration(value)?,
@@ -13136,6 +13150,7 @@ impl RuleEnum {
             Self::VitestPreferToContain(rule) => rule.to_configuration(),
             Self::VitestPreferTodo(rule) => rule.to_configuration(),
             Self::VitestRequireAwaitedExpectPoll(rule) => rule.to_configuration(),
+            Self::VitestRequireHook(rule) => rule.to_configuration(),
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(rule) => {
                 rule.to_configuration()
             }
@@ -13902,6 +13917,7 @@ impl RuleEnum {
             Self::VitestPreferToContain(rule) => rule.run(node, ctx),
             Self::VitestPreferTodo(rule) => rule.run(node, ctx),
             Self::VitestRequireAwaitedExpectPoll(rule) => rule.run(node, ctx),
+            Self::VitestRequireHook(rule) => rule.run(node, ctx),
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(rule) => rule.run(node, ctx),
             Self::VitestRequireMockTypeParameters(rule) => rule.run(node, ctx),
             Self::VitestRequireTestTimeout(rule) => rule.run(node, ctx),
@@ -14666,6 +14682,7 @@ impl RuleEnum {
             Self::VitestPreferToContain(rule) => rule.run_once(ctx),
             Self::VitestPreferTodo(rule) => rule.run_once(ctx),
             Self::VitestRequireAwaitedExpectPoll(rule) => rule.run_once(ctx),
+            Self::VitestRequireHook(rule) => rule.run_once(ctx),
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(rule) => rule.run_once(ctx),
             Self::VitestRequireMockTypeParameters(rule) => rule.run_once(ctx),
             Self::VitestRequireTestTimeout(rule) => rule.run_once(ctx),
@@ -15532,6 +15549,7 @@ impl RuleEnum {
             Self::VitestPreferToContain(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferTodo(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestRequireAwaitedExpectPoll(rule) => rule.run_on_jest_node(jest_node, ctx),
+            Self::VitestRequireHook(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(rule) => {
                 rule.run_on_jest_node(jest_node, ctx)
             }
@@ -16300,6 +16318,7 @@ impl RuleEnum {
             Self::VitestPreferToContain(rule) => rule.should_run(ctx),
             Self::VitestPreferTodo(rule) => rule.should_run(ctx),
             Self::VitestRequireAwaitedExpectPoll(rule) => rule.should_run(ctx),
+            Self::VitestRequireHook(rule) => rule.should_run(ctx),
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(rule) => rule.should_run(ctx),
             Self::VitestRequireMockTypeParameters(rule) => rule.should_run(ctx),
             Self::VitestRequireTestTimeout(rule) => rule.should_run(ctx),
@@ -17378,6 +17397,7 @@ impl RuleEnum {
             Self::VitestRequireAwaitedExpectPoll(_) => {
                 VitestRequireAwaitedExpectPoll::IS_TSGOLINT_RULE
             }
+            Self::VitestRequireHook(_) => VitestRequireHook::IS_TSGOLINT_RULE,
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(_) => {
                 VitestRequireLocalTestContextForConcurrentSnapshots::IS_TSGOLINT_RULE
             }
@@ -18308,6 +18328,7 @@ impl RuleEnum {
             Self::VitestPreferToContain(_) => VitestPreferToContain::VERSION,
             Self::VitestPreferTodo(_) => VitestPreferTodo::VERSION,
             Self::VitestRequireAwaitedExpectPoll(_) => VitestRequireAwaitedExpectPoll::VERSION,
+            Self::VitestRequireHook(_) => VitestRequireHook::VERSION,
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(_) => {
                 VitestRequireLocalTestContextForConcurrentSnapshots::VERSION
             }
@@ -19257,6 +19278,7 @@ impl RuleEnum {
             Self::VitestPreferToContain(_) => VitestPreferToContain::HAS_CONFIG,
             Self::VitestPreferTodo(_) => VitestPreferTodo::HAS_CONFIG,
             Self::VitestRequireAwaitedExpectPoll(_) => VitestRequireAwaitedExpectPoll::HAS_CONFIG,
+            Self::VitestRequireHook(_) => VitestRequireHook::HAS_CONFIG,
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(_) => {
                 VitestRequireLocalTestContextForConcurrentSnapshots::HAS_CONFIG
             }
@@ -20029,6 +20051,7 @@ impl RuleEnum {
             Self::VitestPreferToContain(rule) => rule.types_info(),
             Self::VitestPreferTodo(rule) => rule.types_info(),
             Self::VitestRequireAwaitedExpectPoll(rule) => rule.types_info(),
+            Self::VitestRequireHook(rule) => rule.types_info(),
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(rule) => rule.types_info(),
             Self::VitestRequireMockTypeParameters(rule) => rule.types_info(),
             Self::VitestRequireTestTimeout(rule) => rule.types_info(),
@@ -20793,6 +20816,7 @@ impl RuleEnum {
             Self::VitestPreferToContain(rule) => rule.run_info(),
             Self::VitestPreferTodo(rule) => rule.run_info(),
             Self::VitestRequireAwaitedExpectPoll(rule) => rule.run_info(),
+            Self::VitestRequireHook(rule) => rule.run_info(),
             Self::VitestRequireLocalTestContextForConcurrentSnapshots(rule) => rule.run_info(),
             Self::VitestRequireMockTypeParameters(rule) => rule.run_info(),
             Self::VitestRequireTestTimeout(rule) => rule.run_info(),
@@ -21677,6 +21701,7 @@ pub static RULES: std::sync::LazyLock<Vec<RuleEnum>> = std::sync::LazyLock::new(
         RuleEnum::VitestPreferToContain(VitestPreferToContain::default()),
         RuleEnum::VitestPreferTodo(VitestPreferTodo::default()),
         RuleEnum::VitestRequireAwaitedExpectPoll(VitestRequireAwaitedExpectPoll::default()),
+        RuleEnum::VitestRequireHook(VitestRequireHook::default()),
         RuleEnum::VitestRequireLocalTestContextForConcurrentSnapshots(
             VitestRequireLocalTestContextForConcurrentSnapshots::default(),
         ),

@@ -21,6 +21,7 @@ pub mod prefer_expect_assertions;
 pub mod prefer_snapshot_hint;
 pub mod prefer_to_contain;
 pub mod prefer_todo;
+pub mod require_hook;
 pub mod require_to_throw_message;
 pub mod require_top_level_describe;
 pub mod valid_describe_callback;

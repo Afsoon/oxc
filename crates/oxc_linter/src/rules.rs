@@ -764,6 +764,7 @@ pub(crate) mod vitest {
     pub mod prefer_to_contain;
     pub mod prefer_todo;
     pub mod require_awaited_expect_poll;
+    pub mod require_hook;
     pub mod require_local_test_context_for_concurrent_snapshots;
     pub mod require_mock_type_parameters;
     pub mod require_test_timeout;
