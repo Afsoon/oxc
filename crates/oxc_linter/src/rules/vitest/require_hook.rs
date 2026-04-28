@@ -1,3 +1,4 @@
+use oxc_ast::AstKind;
 use oxc_macros::declare_oxc_lint;
 use oxc_semantic::AstNode;
 use serde::Deserialize;
@@ -26,7 +27,11 @@ impl Rule for RequireHook {
     }
 
     fn run<'a>(&self, node: &AstNode<'a>, ctx: &LintContext<'a>) {
-        self.0.run(node, ctx);
+        match node.kind() {
+            AstKind::Program(_) => self.0.run(node, ctx),
+            AstKind::CallExpression(_) => self.0.run(node, ctx),
+            _ => {}
+        }
     }
 }
 
