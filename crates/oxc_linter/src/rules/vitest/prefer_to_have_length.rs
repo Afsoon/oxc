@@ -10,7 +10,7 @@ use crate::{
 #[derive(Debug, Default, Clone)]
 pub struct PreferToHaveLength;
 
-declare_oxc_lint!(PreferToHaveLength, jest, style, fix, docs = DOCUMENTATION, version = "0.2.13",);
+declare_oxc_lint!(PreferToHaveLength, vitest, style, fix, docs = DOCUMENTATION, version = "0.2.13",);
 
 impl Rule for PreferToHaveLength {
     fn run_on_jest_node<'a, 'c>(
@@ -104,7 +104,7 @@ fn tests() {
     ];
 
     Tester::new(PreferToHaveLength::NAME, PreferToHaveLength::PLUGIN, pass, fail)
-        .with_jest_plugin(true)
+        .with_vitest_plugin(true)
         .expect_fix(fix)
         .test_and_snapshot();
 }

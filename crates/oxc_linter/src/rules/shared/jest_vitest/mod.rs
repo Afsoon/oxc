@@ -20,6 +20,7 @@ pub mod no_standalone_expect;
 pub mod prefer_expect_assertions;
 pub mod prefer_snapshot_hint;
 pub mod prefer_to_contain;
+pub mod prefer_to_have_length;
 pub mod prefer_todo;
 pub mod require_hook;
 pub mod require_to_throw_message;
