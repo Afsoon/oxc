@@ -22,23 +22,33 @@ fn prefer_to_have_been_called_times_diagnostic(span: Span) -> OxcDiagnostic {
     .with_label(span)
 }
 
-macro_rules! documentation {
-    ($link:literal) => {
-        concat!(
-            "### What it does\n\nIn order to have a better failure message, [`toHaveBeenCalledTimes` should be used\ninstead of directly checking the length of `mock.calls`](",
-            $link,
-            ").\n\n### Why is this bad?\n\nThis rule triggers a warning if `toHaveLength` is used to assert the number of times a mock is called.\n\n### Examples\n\nExamples of **incorrect** code for this rule:\n```js\nexpect(someFunction.mock.calls).toHaveLength(1);\nexpect(someFunction.mock.calls).toHaveLength(0);\nexpect(someFunction.mock.calls).not.toHaveLength(1);\n```\n\nExamples of **correct** code for this rule:\n```js\nexpect(someFunction).toHaveBeenCalledTimes(1);\nexpect(someFunction).toHaveBeenCalledTimes(0);\nexpect(someFunction).not.toHaveBeenCalledTimes(0);\nexpect(uncalledFunction).not.toBeCalled();\nexpect(method.mock.calls[0][0]).toStrictEqual(value);\n```\n",
-        )
-    };
-}
+pub const DOCUMENTATION: &str = r"### What it does
 
-pub const DOCUMENTATION_JEST: &str = documentation!(
-    "https://github.com/jest-community/eslint-plugin-jest/blob/v29.5.0/docs/rules/prefer-to-have-been-called-times.md"
-);
+In order to have a better failure message, [`toHaveBeenCalledTimes` should be used
+instead of directly checking the length of `mock.calls`](https://github.com/jest-community/eslint-plugin-jest/blob/v29.5.0/docs/rules/prefer-to-have-been-called-times.md).
 
-pub const DOCUMENTATION_VITEST: &str = documentation!(
-    "https://github.com/vitest-dev/eslint-plugin-vitest/blob/main/docs/rules/prefer-to-have-been-called-times.md"
-);
+### Why is this bad?
+
+This rule triggers a warning if `toHaveLength` is used to assert the number of times a mock is called.
+
+### Examples
+
+Examples of **incorrect** code for this rule:
+```js
+expect(someFunction.mock.calls).toHaveLength(1);
+expect(someFunction.mock.calls).toHaveLength(0);
+expect(someFunction.mock.calls).not.toHaveLength(1);
+```
+
+Examples of **correct** code for this rule:
+```js
+expect(someFunction).toHaveBeenCalledTimes(1);
+expect(someFunction).toHaveBeenCalledTimes(0);
+expect(someFunction).not.toHaveBeenCalledTimes(0);
+expect(uncalledFunction).not.toBeCalled();
+expect(method.mock.calls[0][0]).toStrictEqual(value);
+```
+";
 
 pub fn run<'a>(possible_jest_node: &PossibleJestNode<'a, '_>, ctx: &LintContext<'a>) {
     let node = possible_jest_node.node;
