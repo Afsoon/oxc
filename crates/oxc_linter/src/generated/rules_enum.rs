@@ -30,6 +30,7 @@ pub use crate::rules::eslint::grouped_accessor_pairs::GroupedAccessorPairs as Es
 pub use crate::rules::eslint::guard_for_in::GuardForIn as EslintGuardForIn;
 pub use crate::rules::eslint::id_length::IdLength as EslintIdLength;
 pub use crate::rules::eslint::init_declarations::InitDeclarations as EslintInitDeclarations;
+pub use crate::rules::eslint::logical_assignment_operators::LogicalAssignmentOperators as EslintLogicalAssignmentOperators;
 pub use crate::rules::eslint::max_classes_per_file::MaxClassesPerFile as EslintMaxClassesPerFile;
 pub use crate::rules::eslint::max_depth::MaxDepth as EslintMaxDepth;
 pub use crate::rules::eslint::max_lines::MaxLines as EslintMaxLines;
@@ -739,6 +740,7 @@ pub use crate::rules::vitest::prefer_to_be_falsy::PreferToBeFalsy as VitestPrefe
 pub use crate::rules::vitest::prefer_to_be_object::PreferToBeObject as VitestPreferToBeObject;
 pub use crate::rules::vitest::prefer_to_be_truthy::PreferToBeTruthy as VitestPreferToBeTruthy;
 pub use crate::rules::vitest::prefer_to_contain::PreferToContain as VitestPreferToContain;
+pub use crate::rules::vitest::prefer_to_have_been_called_times::PreferToHaveBeenCalledTimes as VitestPreferToHaveBeenCalledTimes;
 pub use crate::rules::vitest::prefer_to_have_length::PreferToHaveLength as VitestPreferToHaveLength;
 pub use crate::rules::vitest::prefer_todo::PreferTodo as VitestPreferTodo;
 pub use crate::rules::vitest::require_awaited_expect_poll::RequireAwaitedExpectPoll as VitestRequireAwaitedExpectPoll;
@@ -839,6 +841,7 @@ pub enum RuleEnum {
     EslintGuardForIn(EslintGuardForIn),
     EslintIdLength(EslintIdLength),
     EslintInitDeclarations(EslintInitDeclarations),
+    EslintLogicalAssignmentOperators(EslintLogicalAssignmentOperators),
     EslintMaxClassesPerFile(EslintMaxClassesPerFile),
     EslintMaxDepth(EslintMaxDepth),
     EslintMaxLines(EslintMaxLines),
@@ -1512,6 +1515,7 @@ pub enum RuleEnum {
     VitestPreferToBeObject(VitestPreferToBeObject),
     VitestPreferToBeTruthy(VitestPreferToBeTruthy),
     VitestPreferToContain(VitestPreferToContain),
+    VitestPreferToHaveBeenCalledTimes(VitestPreferToHaveBeenCalledTimes),
     VitestPreferToHaveLength(VitestPreferToHaveLength),
     VitestPreferTodo(VitestPreferTodo),
     VitestRequireAwaitedExpectPoll(VitestRequireAwaitedExpectPoll),
@@ -1612,7 +1616,8 @@ const ESLINT_GROUPED_ACCESSOR_PAIRS_ID: usize = ESLINT_GETTER_RETURN_ID + 1usize
 const ESLINT_GUARD_FOR_IN_ID: usize = ESLINT_GROUPED_ACCESSOR_PAIRS_ID + 1usize;
 const ESLINT_ID_LENGTH_ID: usize = ESLINT_GUARD_FOR_IN_ID + 1usize;
 const ESLINT_INIT_DECLARATIONS_ID: usize = ESLINT_ID_LENGTH_ID + 1usize;
-const ESLINT_MAX_CLASSES_PER_FILE_ID: usize = ESLINT_INIT_DECLARATIONS_ID + 1usize;
+const ESLINT_LOGICAL_ASSIGNMENT_OPERATORS_ID: usize = ESLINT_INIT_DECLARATIONS_ID + 1usize;
+const ESLINT_MAX_CLASSES_PER_FILE_ID: usize = ESLINT_LOGICAL_ASSIGNMENT_OPERATORS_ID + 1usize;
 const ESLINT_MAX_DEPTH_ID: usize = ESLINT_MAX_CLASSES_PER_FILE_ID + 1usize;
 const ESLINT_MAX_LINES_ID: usize = ESLINT_MAX_DEPTH_ID + 1usize;
 const ESLINT_MAX_LINES_PER_FUNCTION_ID: usize = ESLINT_MAX_LINES_ID + 1usize;
@@ -2373,7 +2378,8 @@ const VITEST_PREFER_TO_BE_FALSY_ID: usize = VITEST_PREFER_STRICT_BOOLEAN_MATCHER
 const VITEST_PREFER_TO_BE_OBJECT_ID: usize = VITEST_PREFER_TO_BE_FALSY_ID + 1usize;
 const VITEST_PREFER_TO_BE_TRUTHY_ID: usize = VITEST_PREFER_TO_BE_OBJECT_ID + 1usize;
 const VITEST_PREFER_TO_CONTAIN_ID: usize = VITEST_PREFER_TO_BE_TRUTHY_ID + 1usize;
-const VITEST_PREFER_TO_HAVE_LENGTH_ID: usize = VITEST_PREFER_TO_CONTAIN_ID + 1usize;
+const VITEST_PREFER_TO_HAVE_BEEN_CALLED_TIMES_ID: usize = VITEST_PREFER_TO_CONTAIN_ID + 1usize;
+const VITEST_PREFER_TO_HAVE_LENGTH_ID: usize = VITEST_PREFER_TO_HAVE_BEEN_CALLED_TIMES_ID + 1usize;
 const VITEST_PREFER_TODO_ID: usize = VITEST_PREFER_TO_HAVE_LENGTH_ID + 1usize;
 const VITEST_REQUIRE_AWAITED_EXPECT_POLL_ID: usize = VITEST_PREFER_TODO_ID + 1usize;
 const VITEST_REQUIRE_HOOK_ID: usize = VITEST_REQUIRE_AWAITED_EXPECT_POLL_ID + 1usize;
@@ -2480,6 +2486,7 @@ impl RuleEnum {
             Self::EslintGuardForIn(_) => ESLINT_GUARD_FOR_IN_ID,
             Self::EslintIdLength(_) => ESLINT_ID_LENGTH_ID,
             Self::EslintInitDeclarations(_) => ESLINT_INIT_DECLARATIONS_ID,
+            Self::EslintLogicalAssignmentOperators(_) => ESLINT_LOGICAL_ASSIGNMENT_OPERATORS_ID,
             Self::EslintMaxClassesPerFile(_) => ESLINT_MAX_CLASSES_PER_FILE_ID,
             Self::EslintMaxDepth(_) => ESLINT_MAX_DEPTH_ID,
             Self::EslintMaxLines(_) => ESLINT_MAX_LINES_ID,
@@ -3263,6 +3270,9 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(_) => VITEST_PREFER_TO_BE_OBJECT_ID,
             Self::VitestPreferToBeTruthy(_) => VITEST_PREFER_TO_BE_TRUTHY_ID,
             Self::VitestPreferToContain(_) => VITEST_PREFER_TO_CONTAIN_ID,
+            Self::VitestPreferToHaveBeenCalledTimes(_) => {
+                VITEST_PREFER_TO_HAVE_BEEN_CALLED_TIMES_ID
+            }
             Self::VitestPreferToHaveLength(_) => VITEST_PREFER_TO_HAVE_LENGTH_ID,
             Self::VitestPreferTodo(_) => VITEST_PREFER_TODO_ID,
             Self::VitestRequireAwaitedExpectPoll(_) => VITEST_REQUIRE_AWAITED_EXPECT_POLL_ID,
@@ -3368,6 +3378,7 @@ impl RuleEnum {
             Self::EslintGuardForIn(_) => EslintGuardForIn::NAME,
             Self::EslintIdLength(_) => EslintIdLength::NAME,
             Self::EslintInitDeclarations(_) => EslintInitDeclarations::NAME,
+            Self::EslintLogicalAssignmentOperators(_) => EslintLogicalAssignmentOperators::NAME,
             Self::EslintMaxClassesPerFile(_) => EslintMaxClassesPerFile::NAME,
             Self::EslintMaxDepth(_) => EslintMaxDepth::NAME,
             Self::EslintMaxLines(_) => EslintMaxLines::NAME,
@@ -4139,6 +4150,7 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(_) => VitestPreferToBeObject::NAME,
             Self::VitestPreferToBeTruthy(_) => VitestPreferToBeTruthy::NAME,
             Self::VitestPreferToContain(_) => VitestPreferToContain::NAME,
+            Self::VitestPreferToHaveBeenCalledTimes(_) => VitestPreferToHaveBeenCalledTimes::NAME,
             Self::VitestPreferToHaveLength(_) => VitestPreferToHaveLength::NAME,
             Self::VitestPreferTodo(_) => VitestPreferTodo::NAME,
             Self::VitestRequireAwaitedExpectPoll(_) => VitestRequireAwaitedExpectPoll::NAME,
@@ -4246,6 +4258,7 @@ impl RuleEnum {
             Self::EslintGuardForIn(_) => EslintGuardForIn::CATEGORY,
             Self::EslintIdLength(_) => EslintIdLength::CATEGORY,
             Self::EslintInitDeclarations(_) => EslintInitDeclarations::CATEGORY,
+            Self::EslintLogicalAssignmentOperators(_) => EslintLogicalAssignmentOperators::CATEGORY,
             Self::EslintMaxClassesPerFile(_) => EslintMaxClassesPerFile::CATEGORY,
             Self::EslintMaxDepth(_) => EslintMaxDepth::CATEGORY,
             Self::EslintMaxLines(_) => EslintMaxLines::CATEGORY,
@@ -5067,6 +5080,9 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(_) => VitestPreferToBeObject::CATEGORY,
             Self::VitestPreferToBeTruthy(_) => VitestPreferToBeTruthy::CATEGORY,
             Self::VitestPreferToContain(_) => VitestPreferToContain::CATEGORY,
+            Self::VitestPreferToHaveBeenCalledTimes(_) => {
+                VitestPreferToHaveBeenCalledTimes::CATEGORY
+            }
             Self::VitestPreferToHaveLength(_) => VitestPreferToHaveLength::CATEGORY,
             Self::VitestPreferTodo(_) => VitestPreferTodo::CATEGORY,
             Self::VitestRequireAwaitedExpectPoll(_) => VitestRequireAwaitedExpectPoll::CATEGORY,
@@ -5175,6 +5191,7 @@ impl RuleEnum {
             Self::EslintGuardForIn(_) => EslintGuardForIn::FIX,
             Self::EslintIdLength(_) => EslintIdLength::FIX,
             Self::EslintInitDeclarations(_) => EslintInitDeclarations::FIX,
+            Self::EslintLogicalAssignmentOperators(_) => EslintLogicalAssignmentOperators::FIX,
             Self::EslintMaxClassesPerFile(_) => EslintMaxClassesPerFile::FIX,
             Self::EslintMaxDepth(_) => EslintMaxDepth::FIX,
             Self::EslintMaxLines(_) => EslintMaxLines::FIX,
@@ -5946,6 +5963,7 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(_) => VitestPreferToBeObject::FIX,
             Self::VitestPreferToBeTruthy(_) => VitestPreferToBeTruthy::FIX,
             Self::VitestPreferToContain(_) => VitestPreferToContain::FIX,
+            Self::VitestPreferToHaveBeenCalledTimes(_) => VitestPreferToHaveBeenCalledTimes::FIX,
             Self::VitestPreferToHaveLength(_) => VitestPreferToHaveLength::FIX,
             Self::VitestPreferTodo(_) => VitestPreferTodo::FIX,
             Self::VitestRequireAwaitedExpectPoll(_) => VitestRequireAwaitedExpectPoll::FIX,
@@ -6058,6 +6076,9 @@ impl RuleEnum {
             Self::EslintGuardForIn(_) => EslintGuardForIn::documentation(),
             Self::EslintIdLength(_) => EslintIdLength::documentation(),
             Self::EslintInitDeclarations(_) => EslintInitDeclarations::documentation(),
+            Self::EslintLogicalAssignmentOperators(_) => {
+                EslintLogicalAssignmentOperators::documentation()
+            }
             Self::EslintMaxClassesPerFile(_) => EslintMaxClassesPerFile::documentation(),
             Self::EslintMaxDepth(_) => EslintMaxDepth::documentation(),
             Self::EslintMaxLines(_) => EslintMaxLines::documentation(),
@@ -7039,6 +7060,9 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(_) => VitestPreferToBeObject::documentation(),
             Self::VitestPreferToBeTruthy(_) => VitestPreferToBeTruthy::documentation(),
             Self::VitestPreferToContain(_) => VitestPreferToContain::documentation(),
+            Self::VitestPreferToHaveBeenCalledTimes(_) => {
+                VitestPreferToHaveBeenCalledTimes::documentation()
+            }
             Self::VitestPreferToHaveLength(_) => VitestPreferToHaveLength::documentation(),
             Self::VitestPreferTodo(_) => VitestPreferTodo::documentation(),
             Self::VitestRequireAwaitedExpectPoll(_) => {
@@ -7242,6 +7266,10 @@ impl RuleEnum {
                 .or_else(|| EslintIdLength::schema(generator)),
             Self::EslintInitDeclarations(_) => EslintInitDeclarations::config_schema(generator)
                 .or_else(|| EslintInitDeclarations::schema(generator)),
+            Self::EslintLogicalAssignmentOperators(_) => {
+                EslintLogicalAssignmentOperators::config_schema(generator)
+                    .or_else(|| EslintLogicalAssignmentOperators::schema(generator))
+            }
             Self::EslintMaxClassesPerFile(_) => EslintMaxClassesPerFile::config_schema(generator)
                 .or_else(|| EslintMaxClassesPerFile::schema(generator)),
             Self::EslintMaxDepth(_) => EslintMaxDepth::config_schema(generator)
@@ -9171,6 +9199,10 @@ impl RuleEnum {
                 .or_else(|| VitestPreferToBeTruthy::schema(generator)),
             Self::VitestPreferToContain(_) => VitestPreferToContain::config_schema(generator)
                 .or_else(|| VitestPreferToContain::schema(generator)),
+            Self::VitestPreferToHaveBeenCalledTimes(_) => {
+                VitestPreferToHaveBeenCalledTimes::config_schema(generator)
+                    .or_else(|| VitestPreferToHaveBeenCalledTimes::schema(generator))
+            }
             Self::VitestPreferToHaveLength(_) => VitestPreferToHaveLength::config_schema(generator)
                 .or_else(|| VitestPreferToHaveLength::schema(generator)),
             Self::VitestPreferTodo(_) => VitestPreferTodo::config_schema(generator)
@@ -9356,6 +9388,7 @@ impl RuleEnum {
             Self::EslintGuardForIn(_) => "eslint",
             Self::EslintIdLength(_) => "eslint",
             Self::EslintInitDeclarations(_) => "eslint",
+            Self::EslintLogicalAssignmentOperators(_) => "eslint",
             Self::EslintMaxClassesPerFile(_) => "eslint",
             Self::EslintMaxDepth(_) => "eslint",
             Self::EslintMaxLines(_) => "eslint",
@@ -10027,6 +10060,7 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(_) => "vitest",
             Self::VitestPreferToBeTruthy(_) => "vitest",
             Self::VitestPreferToContain(_) => "vitest",
+            Self::VitestPreferToHaveBeenCalledTimes(_) => "vitest",
             Self::VitestPreferToHaveLength(_) => "vitest",
             Self::VitestPreferTodo(_) => "vitest",
             Self::VitestRequireAwaitedExpectPoll(_) => "vitest",
@@ -10232,6 +10266,11 @@ impl RuleEnum {
             }
             Self::EslintInitDeclarations(_) => {
                 Ok(Self::EslintInitDeclarations(EslintInitDeclarations::from_configuration(value)?))
+            }
+            Self::EslintLogicalAssignmentOperators(_) => {
+                Ok(Self::EslintLogicalAssignmentOperators(
+                    EslintLogicalAssignmentOperators::from_configuration(value)?,
+                ))
             }
             Self::EslintMaxClassesPerFile(_) => Ok(Self::EslintMaxClassesPerFile(
                 EslintMaxClassesPerFile::from_configuration(value)?,
@@ -12410,6 +12449,11 @@ impl RuleEnum {
             Self::VitestPreferToContain(_) => {
                 Ok(Self::VitestPreferToContain(VitestPreferToContain::from_configuration(value)?))
             }
+            Self::VitestPreferToHaveBeenCalledTimes(_) => {
+                Ok(Self::VitestPreferToHaveBeenCalledTimes(
+                    VitestPreferToHaveBeenCalledTimes::from_configuration(value)?,
+                ))
+            }
             Self::VitestPreferToHaveLength(_) => Ok(Self::VitestPreferToHaveLength(
                 VitestPreferToHaveLength::from_configuration(value)?,
             )),
@@ -12603,6 +12647,7 @@ impl RuleEnum {
             Self::EslintGuardForIn(rule) => rule.to_configuration(),
             Self::EslintIdLength(rule) => rule.to_configuration(),
             Self::EslintInitDeclarations(rule) => rule.to_configuration(),
+            Self::EslintLogicalAssignmentOperators(rule) => rule.to_configuration(),
             Self::EslintMaxClassesPerFile(rule) => rule.to_configuration(),
             Self::EslintMaxDepth(rule) => rule.to_configuration(),
             Self::EslintMaxLines(rule) => rule.to_configuration(),
@@ -13276,6 +13321,7 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(rule) => rule.to_configuration(),
             Self::VitestPreferToBeTruthy(rule) => rule.to_configuration(),
             Self::VitestPreferToContain(rule) => rule.to_configuration(),
+            Self::VitestPreferToHaveBeenCalledTimes(rule) => rule.to_configuration(),
             Self::VitestPreferToHaveLength(rule) => rule.to_configuration(),
             Self::VitestPreferTodo(rule) => rule.to_configuration(),
             Self::VitestRequireAwaitedExpectPoll(rule) => rule.to_configuration(),
@@ -13379,6 +13425,7 @@ impl RuleEnum {
             Self::EslintGuardForIn(rule) => rule.run(node, ctx),
             Self::EslintIdLength(rule) => rule.run(node, ctx),
             Self::EslintInitDeclarations(rule) => rule.run(node, ctx),
+            Self::EslintLogicalAssignmentOperators(rule) => rule.run(node, ctx),
             Self::EslintMaxClassesPerFile(rule) => rule.run(node, ctx),
             Self::EslintMaxDepth(rule) => rule.run(node, ctx),
             Self::EslintMaxLines(rule) => rule.run(node, ctx),
@@ -14050,6 +14097,7 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(rule) => rule.run(node, ctx),
             Self::VitestPreferToBeTruthy(rule) => rule.run(node, ctx),
             Self::VitestPreferToContain(rule) => rule.run(node, ctx),
+            Self::VitestPreferToHaveBeenCalledTimes(rule) => rule.run(node, ctx),
             Self::VitestPreferToHaveLength(rule) => rule.run(node, ctx),
             Self::VitestPreferTodo(rule) => rule.run(node, ctx),
             Self::VitestRequireAwaitedExpectPoll(rule) => rule.run(node, ctx),
@@ -14151,6 +14199,7 @@ impl RuleEnum {
             Self::EslintGuardForIn(rule) => rule.run_once(ctx),
             Self::EslintIdLength(rule) => rule.run_once(ctx),
             Self::EslintInitDeclarations(rule) => rule.run_once(ctx),
+            Self::EslintLogicalAssignmentOperators(rule) => rule.run_once(ctx),
             Self::EslintMaxClassesPerFile(rule) => rule.run_once(ctx),
             Self::EslintMaxDepth(rule) => rule.run_once(ctx),
             Self::EslintMaxLines(rule) => rule.run_once(ctx),
@@ -14822,6 +14871,7 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(rule) => rule.run_once(ctx),
             Self::VitestPreferToBeTruthy(rule) => rule.run_once(ctx),
             Self::VitestPreferToContain(rule) => rule.run_once(ctx),
+            Self::VitestPreferToHaveBeenCalledTimes(rule) => rule.run_once(ctx),
             Self::VitestPreferToHaveLength(rule) => rule.run_once(ctx),
             Self::VitestPreferTodo(rule) => rule.run_once(ctx),
             Self::VitestRequireAwaitedExpectPoll(rule) => rule.run_once(ctx),
@@ -14927,6 +14977,7 @@ impl RuleEnum {
             Self::EslintGuardForIn(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::EslintIdLength(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::EslintInitDeclarations(rule) => rule.run_on_jest_node(jest_node, ctx),
+            Self::EslintLogicalAssignmentOperators(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::EslintMaxClassesPerFile(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::EslintMaxDepth(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::EslintMaxLines(rule) => rule.run_on_jest_node(jest_node, ctx),
@@ -15698,6 +15749,7 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferToBeTruthy(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferToContain(rule) => rule.run_on_jest_node(jest_node, ctx),
+            Self::VitestPreferToHaveBeenCalledTimes(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferToHaveLength(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestPreferTodo(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::VitestRequireAwaitedExpectPoll(rule) => rule.run_on_jest_node(jest_node, ctx),
@@ -15803,6 +15855,7 @@ impl RuleEnum {
             Self::EslintGuardForIn(rule) => rule.should_run(ctx),
             Self::EslintIdLength(rule) => rule.should_run(ctx),
             Self::EslintInitDeclarations(rule) => rule.should_run(ctx),
+            Self::EslintLogicalAssignmentOperators(rule) => rule.should_run(ctx),
             Self::EslintMaxClassesPerFile(rule) => rule.should_run(ctx),
             Self::EslintMaxDepth(rule) => rule.should_run(ctx),
             Self::EslintMaxLines(rule) => rule.should_run(ctx),
@@ -16474,6 +16527,7 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(rule) => rule.should_run(ctx),
             Self::VitestPreferToBeTruthy(rule) => rule.should_run(ctx),
             Self::VitestPreferToContain(rule) => rule.should_run(ctx),
+            Self::VitestPreferToHaveBeenCalledTimes(rule) => rule.should_run(ctx),
             Self::VitestPreferToHaveLength(rule) => rule.should_run(ctx),
             Self::VitestPreferTodo(rule) => rule.should_run(ctx),
             Self::VitestRequireAwaitedExpectPoll(rule) => rule.should_run(ctx),
@@ -16581,6 +16635,9 @@ impl RuleEnum {
             Self::EslintGuardForIn(_) => EslintGuardForIn::IS_TSGOLINT_RULE,
             Self::EslintIdLength(_) => EslintIdLength::IS_TSGOLINT_RULE,
             Self::EslintInitDeclarations(_) => EslintInitDeclarations::IS_TSGOLINT_RULE,
+            Self::EslintLogicalAssignmentOperators(_) => {
+                EslintLogicalAssignmentOperators::IS_TSGOLINT_RULE
+            }
             Self::EslintMaxClassesPerFile(_) => EslintMaxClassesPerFile::IS_TSGOLINT_RULE,
             Self::EslintMaxDepth(_) => EslintMaxDepth::IS_TSGOLINT_RULE,
             Self::EslintMaxLines(_) => EslintMaxLines::IS_TSGOLINT_RULE,
@@ -17562,6 +17619,9 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(_) => VitestPreferToBeObject::IS_TSGOLINT_RULE,
             Self::VitestPreferToBeTruthy(_) => VitestPreferToBeTruthy::IS_TSGOLINT_RULE,
             Self::VitestPreferToContain(_) => VitestPreferToContain::IS_TSGOLINT_RULE,
+            Self::VitestPreferToHaveBeenCalledTimes(_) => {
+                VitestPreferToHaveBeenCalledTimes::IS_TSGOLINT_RULE
+            }
             Self::VitestPreferToHaveLength(_) => VitestPreferToHaveLength::IS_TSGOLINT_RULE,
             Self::VitestPreferTodo(_) => VitestPreferTodo::IS_TSGOLINT_RULE,
             Self::VitestRequireAwaitedExpectPoll(_) => {
@@ -17683,6 +17743,7 @@ impl RuleEnum {
             Self::EslintGuardForIn(_) => EslintGuardForIn::VERSION,
             Self::EslintIdLength(_) => EslintIdLength::VERSION,
             Self::EslintInitDeclarations(_) => EslintInitDeclarations::VERSION,
+            Self::EslintLogicalAssignmentOperators(_) => EslintLogicalAssignmentOperators::VERSION,
             Self::EslintMaxClassesPerFile(_) => EslintMaxClassesPerFile::VERSION,
             Self::EslintMaxDepth(_) => EslintMaxDepth::VERSION,
             Self::EslintMaxLines(_) => EslintMaxLines::VERSION,
@@ -18504,6 +18565,9 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(_) => VitestPreferToBeObject::VERSION,
             Self::VitestPreferToBeTruthy(_) => VitestPreferToBeTruthy::VERSION,
             Self::VitestPreferToContain(_) => VitestPreferToContain::VERSION,
+            Self::VitestPreferToHaveBeenCalledTimes(_) => {
+                VitestPreferToHaveBeenCalledTimes::VERSION
+            }
             Self::VitestPreferToHaveLength(_) => VitestPreferToHaveLength::VERSION,
             Self::VitestPreferTodo(_) => VitestPreferTodo::VERSION,
             Self::VitestRequireAwaitedExpectPoll(_) => VitestRequireAwaitedExpectPoll::VERSION,
@@ -18614,6 +18678,9 @@ impl RuleEnum {
             Self::EslintGuardForIn(_) => EslintGuardForIn::HAS_CONFIG,
             Self::EslintIdLength(_) => EslintIdLength::HAS_CONFIG,
             Self::EslintInitDeclarations(_) => EslintInitDeclarations::HAS_CONFIG,
+            Self::EslintLogicalAssignmentOperators(_) => {
+                EslintLogicalAssignmentOperators::HAS_CONFIG
+            }
             Self::EslintMaxClassesPerFile(_) => EslintMaxClassesPerFile::HAS_CONFIG,
             Self::EslintMaxDepth(_) => EslintMaxDepth::HAS_CONFIG,
             Self::EslintMaxLines(_) => EslintMaxLines::HAS_CONFIG,
@@ -19463,6 +19530,9 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(_) => VitestPreferToBeObject::HAS_CONFIG,
             Self::VitestPreferToBeTruthy(_) => VitestPreferToBeTruthy::HAS_CONFIG,
             Self::VitestPreferToContain(_) => VitestPreferToContain::HAS_CONFIG,
+            Self::VitestPreferToHaveBeenCalledTimes(_) => {
+                VitestPreferToHaveBeenCalledTimes::HAS_CONFIG
+            }
             Self::VitestPreferToHaveLength(_) => VitestPreferToHaveLength::HAS_CONFIG,
             Self::VitestPreferTodo(_) => VitestPreferTodo::HAS_CONFIG,
             Self::VitestRequireAwaitedExpectPoll(_) => VitestRequireAwaitedExpectPoll::HAS_CONFIG,
@@ -19572,6 +19642,7 @@ impl RuleEnum {
             Self::EslintGuardForIn(rule) => rule.types_info(),
             Self::EslintIdLength(rule) => rule.types_info(),
             Self::EslintInitDeclarations(rule) => rule.types_info(),
+            Self::EslintLogicalAssignmentOperators(rule) => rule.types_info(),
             Self::EslintMaxClassesPerFile(rule) => rule.types_info(),
             Self::EslintMaxDepth(rule) => rule.types_info(),
             Self::EslintMaxLines(rule) => rule.types_info(),
@@ -20243,6 +20314,7 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(rule) => rule.types_info(),
             Self::VitestPreferToBeTruthy(rule) => rule.types_info(),
             Self::VitestPreferToContain(rule) => rule.types_info(),
+            Self::VitestPreferToHaveBeenCalledTimes(rule) => rule.types_info(),
             Self::VitestPreferToHaveLength(rule) => rule.types_info(),
             Self::VitestPreferTodo(rule) => rule.types_info(),
             Self::VitestRequireAwaitedExpectPoll(rule) => rule.types_info(),
@@ -20344,6 +20416,7 @@ impl RuleEnum {
             Self::EslintGuardForIn(rule) => rule.run_info(),
             Self::EslintIdLength(rule) => rule.run_info(),
             Self::EslintInitDeclarations(rule) => rule.run_info(),
+            Self::EslintLogicalAssignmentOperators(rule) => rule.run_info(),
             Self::EslintMaxClassesPerFile(rule) => rule.run_info(),
             Self::EslintMaxDepth(rule) => rule.run_info(),
             Self::EslintMaxLines(rule) => rule.run_info(),
@@ -21015,6 +21088,7 @@ impl RuleEnum {
             Self::VitestPreferToBeObject(rule) => rule.run_info(),
             Self::VitestPreferToBeTruthy(rule) => rule.run_info(),
             Self::VitestPreferToContain(rule) => rule.run_info(),
+            Self::VitestPreferToHaveBeenCalledTimes(rule) => rule.run_info(),
             Self::VitestPreferToHaveLength(rule) => rule.run_info(),
             Self::VitestPreferTodo(rule) => rule.run_info(),
             Self::VitestRequireAwaitedExpectPoll(rule) => rule.run_info(),
@@ -21138,6 +21212,7 @@ pub static RULES: std::sync::LazyLock<Vec<RuleEnum>> = std::sync::LazyLock::new(
         RuleEnum::EslintGuardForIn(EslintGuardForIn::default()),
         RuleEnum::EslintIdLength(EslintIdLength::default()),
         RuleEnum::EslintInitDeclarations(EslintInitDeclarations::default()),
+        RuleEnum::EslintLogicalAssignmentOperators(EslintLogicalAssignmentOperators::default()),
         RuleEnum::EslintMaxClassesPerFile(EslintMaxClassesPerFile::default()),
         RuleEnum::EslintMaxDepth(EslintMaxDepth::default()),
         RuleEnum::EslintMaxLines(EslintMaxLines::default()),
@@ -21909,6 +21984,7 @@ pub static RULES: std::sync::LazyLock<Vec<RuleEnum>> = std::sync::LazyLock::new(
         RuleEnum::VitestPreferToBeObject(VitestPreferToBeObject::default()),
         RuleEnum::VitestPreferToBeTruthy(VitestPreferToBeTruthy::default()),
         RuleEnum::VitestPreferToContain(VitestPreferToContain::default()),
+        RuleEnum::VitestPreferToHaveBeenCalledTimes(VitestPreferToHaveBeenCalledTimes::default()),
         RuleEnum::VitestPreferToHaveLength(VitestPreferToHaveLength::default()),
         RuleEnum::VitestPreferTodo(VitestPreferTodo::default()),
         RuleEnum::VitestRequireAwaitedExpectPoll(VitestRequireAwaitedExpectPoll::default()),
