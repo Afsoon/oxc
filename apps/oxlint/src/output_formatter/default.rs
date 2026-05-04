@@ -201,7 +201,7 @@ mod test {
         assert!(result.is_some());
         assert_eq!(
             result.unwrap(),
-            "'oxlint-suppressions.json' has been created in the root folder.\nFinished in 1.0s on 5 files using 12 threads.\n"
+            "Created 'oxlint-suppressions.json' in the root folder.\nFinished in 1.0s on 5 files using 12 threads.\n"
         );
     }
 
@@ -219,7 +219,7 @@ mod test {
         assert!(result.is_some());
         assert_eq!(
             result.unwrap(),
-            "'oxlint-suppressions.json' has been updated.\nFinished in 1.0s on 5 files using 12 threads.\n"
+            "Updated 'oxlint-suppressions.json'.\nFinished in 1.0s on 5 files using 12 threads.\n"
         );
     }
 

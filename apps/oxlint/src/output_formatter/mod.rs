@@ -68,7 +68,7 @@ pub struct LintCommandInfo {
     pub threads_count: usize,
     /// Some reporters want to output the duration it took to finished the task
     pub start_time: Duration,
-    /// At least in default mode we want to notify if bulk-suppressions.json file has been created or update
+    /// At least in default mode we want to notify if oxlint-suppressions.json was created or updated.
     pub oxlint_suppression_file_action: OxlintSuppressionFileAction,
 }
 
@@ -99,10 +99,10 @@ impl LintCommandInfo {
             | OxlintSuppressionFileAction::Exists
             | OxlintSuppressionFileAction::HasUnprunedSuppressions => String::new(),
             OxlintSuppressionFileAction::Created => {
-                "'oxlint-suppressions.json' has been created in the root folder.\n".to_string()
+                "Created 'oxlint-suppressions.json' in the root folder.\n".to_string()
             }
             OxlintSuppressionFileAction::Updated => {
-                "'oxlint-suppressions.json' has been updated.\n".to_string()
+                "Updated 'oxlint-suppressions.json'.\n".to_string()
             }
             OxlintSuppressionFileAction::Malformed(error)
             | OxlintSuppressionFileAction::UnableToPerformFsOperation(error) => {

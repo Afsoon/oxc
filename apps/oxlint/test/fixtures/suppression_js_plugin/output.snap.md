@@ -4,7 +4,7 @@
 # stdout
 ```
 Found 0 warnings and 0 errors.
-'oxlint-suppressions.json' has been updated.
+Updated 'oxlint-suppressions.json'.
 Finished in Xms on 1 file with 94 rules using X threads.
 ```
 
